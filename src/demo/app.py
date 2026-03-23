@@ -29,6 +29,8 @@ CANVAS_W = 980
 CANVAS_H = 640
 PANEL_X = 660
 DRAG_THRESHOLD = 8
+HANDLE_HALF = 6
+MIN_SIZE = 40
 TICK_MS = 100
 
 g = {}
@@ -130,6 +132,7 @@ def reset_demo_state(event=None):
                 {"NAME": "pointer-motion", "ACTIVE": True, "DATA": {}, "FN": tokenizer_pointer_motion},
                 {"NAME": "button-1-transitions", "ACTIVE": True, "DATA": {}, "FN": tokenizer_button_1},
                 {"NAME": "pointer-target", "ACTIVE": True, "DATA": {}, "FN": tokenizer_pointer_target},
+                {"NAME": "resize-handles", "ACTIVE": True, "DATA": {}, "FN": tokenizer_resize_handles},
                 {"NAME": "drag-threshold", "ACTIVE": True, "DATA": {}, "FN": tokenizer_drag_threshold},
             ],
             "ORGANISMS": [
@@ -140,6 +143,14 @@ def reset_demo_state(event=None):
                     "HELD": {},
                     "DATA": {},
                     "FN": organism_hover_highlight,
+                },
+                {
+                    "NAME": "resize-object",
+                    "ACTIVE": True,
+                    "STATE": IDLE,
+                    "HELD": {},
+                    "DATA": {},
+                    "FN": organism_resize_object,
                 },
                 {
                     "NAME": "drag-object",
@@ -195,6 +206,7 @@ def make_initial_derived():
         "left-target": None,
         "drag-threshold-crossed": False,
         "pointer-target": None,
+        "pointer-handle-target": None,
     }
 
 
@@ -360,6 +372,19 @@ def tokenizer_pointer_target(tokenizer):
         derived["left-target"] = prev["mouse-over"]
 
 
+def tokenizer_resize_handles(tokenizer):
+    """Derive whether the pointer is over a visible resize handle."""
+    del tokenizer
+    if not system["RAW"]["inside-canvas"]:
+        system["DERIVED"]["pointer-handle-target"] = None
+        return
+
+    system["DERIVED"]["pointer-handle-target"] = find_resize_handle_at(
+        system["RAW"]["x"],
+        system["RAW"]["y"],
+    )
+
+
 def tokenizer_drag_threshold(tokenizer):
     """Derive when the pointer has moved far enough for dragging to count."""
     derived = system["DERIVED"]
@@ -391,16 +416,32 @@ def maintain_judge():
     coordination = system["COORDINATION"]
     coordination["judge-notes"] = []
 
+    resize = find_organism("resize-object")
     drag = find_organism("drag-object")
     marquee = find_organism("marquee-select")
     drag_group = find_organism("drag-selection-group")
     hover = find_organism("hover-highlight")
+    resize_object = resize["HELD"].get("object-id")
     held_object = drag["HELD"].get("object-id")
     held_group = drag_group["HELD"].get("object-ids", [])
+    resize_lease = coordination["leases"].get("resize-object")
     lease = coordination["leases"].get("drag-object")
     marquee_lease = coordination["leases"].get("marquee-select")
     group_lease = coordination["leases"].get("drag-selection-group")
     coordination["hover-target"] = hover["HELD"].get("object-id")
+
+    if resize["STATE"] == DRAGGING and resize_object and resize_object in world["objects"]:
+        coordination["pointer-owner"] = "resize-object"
+        coordination["active-gesture"] = "resize-object"
+        coordination["resource-holds"] = {resize_object: "resize-object"}
+        coordination["leases"] = {
+            "resize-object": {
+                "resource": resize_object,
+                "kind": "exclusive",
+                "valid": True,
+            }
+        }
+        return
 
     if drag_group["STATE"] == DRAGGING and held_group:
         coordination["pointer-owner"] = "drag-selection-group"
@@ -443,6 +484,8 @@ def maintain_judge():
 
     if lease:
         coordination["judge-notes"].append("released stale drag lease")
+    if resize_lease:
+        coordination["judge-notes"].append("released stale resize lease")
     if group_lease:
         coordination["judge-notes"].append("released stale group-drag lease")
     if marquee_lease:
@@ -504,6 +547,23 @@ def organism_drag_object(organism):
     organism["DATA"] = {}
 
 
+def organism_resize_object(organism):
+    """Recognize press-drag-release on a visible resize handle."""
+    if organism["STATE"] == IDLE:
+        handle_resize_idle_state(organism)
+        return
+
+    if organism["STATE"] == ARMED:
+        handle_resize_armed_state(organism)
+        return
+
+    if organism["STATE"] == DRAGGING:
+        handle_resize_dragging_state(organism)
+        return
+
+    clear_organism(organism)
+
+
 def organism_marquee_select(organism):
     """Recognize drag-selection beginning from empty space."""
     if organism["STATE"] == IDLE:
@@ -543,6 +603,8 @@ def handle_drag_idle_state(organism):
     derived = system["DERIVED"]
     target = derived["pointer-target"]
     if not derived["button-1-pressed"] or not target:
+        return
+    if derived["pointer-handle-target"] is not None:
         return
     if target in world["selected-objects"]:
         return
@@ -616,10 +678,67 @@ def handle_dragging_state(organism):
         clear_organism(organism)
 
 
+def handle_resize_idle_state(organism):
+    """Arm a resize episode when button 1 is pressed on a resize handle."""
+    derived = system["DERIVED"]
+    target = derived["pointer-handle-target"]
+    if not derived["button-1-pressed"] or not target:
+        return
+
+    organism["HELD"] = {"object-id": target["object-id"], "handle": target["handle"]}
+    if not get_permission(START):
+        clear_organism(organism)
+        return
+
+    obj = world["objects"][target["object-id"]]
+    organism["STATE"] = ARMED
+    organism["DATA"] = {
+        "press-point": {"x": system["RAW"]["x"], "y": system["RAW"]["y"]},
+        "start-rect": {"x": obj["x"], "y": obj["y"], "w": obj["w"], "h": obj["h"]},
+    }
+
+
+def handle_resize_armed_state(organism):
+    """Wait until drag intent is clear before claiming resize ownership."""
+    derived = system["DERIVED"]
+    if derived["button-1-released"]:
+        clear_organism(organism)
+        return
+
+    if not derived["drag-threshold-crossed"]:
+        return
+
+    if not get_permission(HOLD_RESOURCE):
+        clear_organism(organism)
+        return
+
+    organism["STATE"] = DRAGGING
+
+
+def handle_resize_dragging_state(organism):
+    """Emit resize effects while the handle drag is active."""
+    emit_world_effect(
+        "resize-object",
+        "resize-object",
+        {
+            "object-id": organism["HELD"]["object-id"],
+            "handle": organism["HELD"]["handle"],
+            "start-rect": organism["DATA"]["start-rect"],
+            "pointer-x": system["RAW"]["x"],
+            "pointer-y": system["RAW"]["y"],
+        },
+    )
+
+    if system["DERIVED"]["button-1-released"]:
+        clear_organism(organism)
+
+
 def handle_marquee_idle_state(organism):
     """Arm marquee selection when button 1 is pressed on empty space."""
     derived = system["DERIVED"]
     if not derived["button-1-pressed"]:
+        return
+    if derived["pointer-handle-target"] is not None:
         return
     if derived["pointer-target"] is not None:
         return
@@ -668,6 +787,8 @@ def handle_group_drag_idle_state(organism):
     target = derived["pointer-target"]
     selected = world["selected-objects"]
     if not derived["button-1-pressed"] or not target:
+        return
+    if derived["pointer-handle-target"] is not None:
         return
     if target not in selected:
         return
@@ -746,6 +867,12 @@ def get_permission(request):
         if coordination["pointer-owner"] not in (None, current):
             coordination["judge-notes"].append("denied START: pointer already owned")
             return False
+        if current == "resize-object":
+            target = organism["HELD"].get("object-id")
+            if target in coordination["resource-holds"]:
+                coordination["judge-notes"].append("denied START: resize target already held")
+                return False
+            return True
         if current == "drag-object":
             target = organism["HELD"].get("object-id")
             if target in coordination["resource-holds"]:
@@ -763,6 +890,25 @@ def get_permission(request):
         return False
 
     if request == HOLD_RESOURCE:
+        if current == "resize-object":
+            target = organism["HELD"].get("object-id")
+            if target not in world["objects"]:
+                coordination["judge-notes"].append("denied HOLD-RESOURCE: missing resize target")
+                return False
+            if coordination["pointer-owner"] not in (None, current):
+                coordination["judge-notes"].append("denied HOLD-RESOURCE: pointer contested")
+                return False
+
+            coordination["pointer-owner"] = current
+            coordination["active-gesture"] = current
+            coordination["resource-holds"] = {target: current}
+            coordination["leases"][current] = {
+                "resource": target,
+                "kind": "exclusive",
+                "valid": True,
+            }
+            return True
+
         if current == "drag-object":
             target = organism["HELD"].get("object-id")
             if target not in world["objects"]:
@@ -835,6 +981,10 @@ def apply_world_effect(effect):
 
     if effect["name"] == "move-selection-group":
         apply_group_move_effect(payload)
+        return
+
+    if effect["name"] == "resize-object":
+        apply_resize_object_effect(payload)
 
 
 def emit_world_effect(source, name, payload):
@@ -910,6 +1060,8 @@ def draw_world_objects():
             font=("TkDefaultFont", 12, "bold"),
         )
 
+    draw_resize_handles()
+
 
 def draw_preview_effects():
     """Draw transient projection artifacts without mutating the world."""
@@ -982,6 +1134,26 @@ def draw_selection_rectangle(payload):
         )
 
 
+def draw_resize_handles():
+    """Draw corner resize handles when exactly one object is selected."""
+    object_id = single_selected_object_id()
+    if object_id is None:
+        return
+
+    obj = world["objects"][object_id]
+    for handle in ("nw", "ne", "sw", "se"):
+        cx, cy = resize_handle_center(obj, handle)
+        g["canvas"].create_rectangle(
+            cx - HANDLE_HALF,
+            cy - HANDLE_HALF,
+            cx + HANDLE_HALF,
+            cy + HANDLE_HALF,
+            fill="#fdfaf2",
+            outline="#1f4f7a",
+            width=2,
+        )
+
+
 def draw_divider():
     """Separate playfield from the architecture inspector panel."""
     g["canvas"].create_line(PANEL_X, 0, PANEL_X, CANVAS_H, fill="#c5bda9", width=2)
@@ -1021,6 +1193,7 @@ def build_panel_lines():
     raw = system["RAW"]
     derived = system["DERIVED"]
     coord = system["COORDINATION"]
+    resize = find_organism("resize-object")
     drag = find_organism("drag-object")
     marquee = find_organism("marquee-select")
     drag_group = find_organism("drag-selection-group")
@@ -1037,6 +1210,7 @@ def build_panel_lines():
         f"  b1-released={derived['button-1-released']}",
         f"  entered={derived['entered-target']}  left={derived['left-target']}",
         f"  drag-threshold-crossed={derived['drag-threshold-crossed']}",
+        f"  pointer-handle-target={derived['pointer-handle-target']}",
         "",
         "WORLD",
         f"  selected={world['selected-objects']}",
@@ -1049,12 +1223,14 @@ def build_panel_lines():
         "",
         "ORGANISMS",
         f"  hover-highlight STATE={hover['STATE']} HELD={hover['HELD']}",
+        f"  resize-object   STATE={resize['STATE']} HELD={resize['HELD']}",
         f"  marquee-select  STATE={marquee['STATE']} HELD={marquee['HELD']}",
         f"  drag-selection  STATE={drag_group['STATE']} HELD={drag_group['HELD']}",
         f"  drag-object     STATE={drag['STATE']} HELD={drag['HELD']}",
         "",
         "NOTES",
         "  ESC or r resets the demo",
+        "  Single selection shows resize handles",
         "  Empty-space drag creates a marquee selection",
         "  Drag a selected object to move the full group",
         f"  judge-notes={coord['judge-notes']}",
@@ -1073,6 +1249,38 @@ def find_object_at(x, y):
 def point_inside_object(x, y, obj):
     """Check whether a point lies inside an object's rectangle."""
     return obj["x"] <= x <= obj["x"] + obj["w"] and obj["y"] <= y <= obj["y"] + obj["h"]
+
+
+def find_resize_handle_at(x, y):
+    """Return the selected object's resize handle under the pointer, if any."""
+    object_id = single_selected_object_id()
+    if object_id is None:
+        return None
+
+    obj = world["objects"][object_id]
+    for handle in ("nw", "ne", "sw", "se"):
+        cx, cy = resize_handle_center(obj, handle)
+        if abs(x - cx) <= HANDLE_HALF and abs(y - cy) <= HANDLE_HALF:
+            return {"object-id": object_id, "handle": handle}
+    return None
+
+
+def single_selected_object_id():
+    """Return the single selected object id, or None otherwise."""
+    if len(world["selected-objects"]) != 1:
+        return None
+    return world["selected-objects"][0]
+
+
+def resize_handle_center(obj, handle):
+    """Return the center point of a named corner resize handle."""
+    if handle == "nw":
+        return obj["x"], obj["y"]
+    if handle == "ne":
+        return obj["x"] + obj["w"], obj["y"]
+    if handle == "sw":
+        return obj["x"], obj["y"] + obj["h"]
+    return obj["x"] + obj["w"], obj["y"] + obj["h"]
 
 
 def find_organism(name):
@@ -1144,6 +1352,45 @@ def apply_group_move_effect(payload):
         start = start_positions[object_id]
         obj["x"] = start["x"] + bounded_dx
         obj["y"] = start["y"] + bounded_dy
+
+
+def apply_resize_object_effect(payload):
+    """Resize one object by applying lawful geometry constraints."""
+    obj = world["objects"][payload["object-id"]]
+    rect = compute_resized_rect(
+        payload["start-rect"],
+        payload["handle"],
+        payload["pointer-x"],
+        payload["pointer-y"],
+    )
+    obj["x"] = rect["x"]
+    obj["y"] = rect["y"]
+    obj["w"] = rect["w"]
+    obj["h"] = rect["h"]
+
+
+def compute_resized_rect(start_rect, handle, pointer_x, pointer_y):
+    """Compute a clamped rectangle from a resize handle drag."""
+    left = start_rect["x"]
+    top = start_rect["y"]
+    right = start_rect["x"] + start_rect["w"]
+    bottom = start_rect["y"] + start_rect["h"]
+
+    if "w" in handle:
+        left = clamp(pointer_x, 20, right - MIN_SIZE)
+    if "e" in handle:
+        right = clamp(pointer_x, left + MIN_SIZE, PANEL_X - 20)
+    if "n" in handle:
+        top = clamp(pointer_y, 20, bottom - MIN_SIZE)
+    if "s" in handle:
+        bottom = clamp(pointer_y, top + MIN_SIZE, CANVAS_H - 20)
+
+    return {
+        "x": left,
+        "y": top,
+        "w": right - left,
+        "h": bottom - top,
+    }
 
 
 def compute_group_delta_bound(start_positions, delta, axis):

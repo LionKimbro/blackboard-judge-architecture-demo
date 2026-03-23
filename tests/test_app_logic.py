@@ -56,6 +56,23 @@ def drag_single(x1, y1, x2, y2):
     release(x2, y2)
 
 
+def click(x, y):
+    press(x, y)
+    release(x, y)
+
+
+def select_alpha():
+    click(120, 120)
+
+
+def drag_resize_handle(object_id, handle, x2, y2):
+    obj = app.world["objects"][object_id]
+    x1, y1 = app.resize_handle_center(obj, handle)
+    press(x1, y1)
+    move(x2, y2)
+    release(x2, y2)
+
+
 def test_idle_tick_accumulates_motionless_duration(monkeypatch):
     setup_demo(monkeypatch)
 
@@ -156,3 +173,63 @@ def test_group_drag_clamps_at_right_boundary(monkeypatch):
     assert bravo["x"] + bravo["w"] == app.PANEL_X - 20
     assert alpha["x"] == 270
     assert bravo["x"] == 470
+
+
+def test_single_selection_exposes_resize_handle_target(monkeypatch):
+    setup_demo(monkeypatch)
+    select_alpha()
+
+    cycle(x=70, y=90, inside_canvas=True)
+
+    assert app.system["DERIVED"]["pointer-handle-target"] == {"object-id": "alpha", "handle": "nw"}
+
+
+def test_dragging_resize_handle_resizes_object(monkeypatch):
+    setup_demo(monkeypatch)
+    select_alpha()
+
+    drag_resize_handle("alpha", "se", 250, 220)
+
+    alpha = app.world["objects"]["alpha"]
+    assert alpha["x"] == 70
+    assert alpha["y"] == 90
+    assert alpha["w"] == 180
+    assert alpha["h"] == 130
+
+
+def test_resize_handle_press_does_not_arm_marquee(monkeypatch):
+    setup_demo(monkeypatch)
+    select_alpha()
+
+    obj = app.world["objects"]["alpha"]
+    x1, y1 = app.resize_handle_center(obj, "nw")
+    press(x1, y1)
+
+    assert app.find_organism("marquee-select")["STATE"] == app.IDLE
+    assert app.find_organism("resize-object")["STATE"] == app.ARMED
+
+
+def test_resize_clamps_to_minimum_size(monkeypatch):
+    setup_demo(monkeypatch)
+    select_alpha()
+
+    drag_resize_handle("alpha", "nw", 300, 300)
+
+    alpha = app.world["objects"]["alpha"]
+    assert alpha["x"] == 170
+    assert alpha["y"] == 150
+    assert alpha["w"] == app.MIN_SIZE
+    assert alpha["h"] == app.MIN_SIZE
+
+
+def test_resize_clamps_to_playfield_bounds(monkeypatch):
+    setup_demo(monkeypatch)
+    select_alpha()
+
+    drag_resize_handle("alpha", "nw", -100, -100)
+
+    alpha = app.world["objects"]["alpha"]
+    assert alpha["x"] == 20
+    assert alpha["y"] == 20
+    assert alpha["w"] == 190
+    assert alpha["h"] == 170
