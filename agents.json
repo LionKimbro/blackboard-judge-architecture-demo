@@ -1,0 +1,31 @@
+{
+  "document": {
+    "document-id": "agent-orientation.v2",
+    "title": "Agent Orientation",
+    "purpose": "Lightweight startup guidance for Claude Code, ChatGPT Codex, or similar agents."
+  },
+  "directives": {
+    "find-the-registry": {
+      "instruction": "Look for a registry.json file. Treat it and any linked system registry as indexes into essential reference material.",
+      "rules": [
+        "If the registry references Lion's definitions file, read it.",
+        "If writing code, read Lion's programming philosophy documents first.",
+        "Do not read every resource preemptively; load what is needed for the immediate task."
+      ]
+    },
+    "project-structure": {
+      "specs-location": "docs/raw/",
+      "source-location": "src/demo/",
+      "tests-location": "tests/",
+      "notes": [
+        "Use standard Python package layout.",
+        "docs/raw/ is the canonical home for project documents."
+      ]
+    },
+    "status-files": [
+      "Keep agent working files in docs/agent/.",
+      "Maintain todo.json, status.json, and judgements.json as needed."
+    ]
+  }
+}
+
