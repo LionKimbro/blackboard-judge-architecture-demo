@@ -257,7 +257,7 @@ def handle_escape_reset(event):
     render_projection()
 
 
-def run_cycle(raw_update):
+def run_cycle(raw_update, render=True):
     """Advance the architecture one cycle from raw input to projection."""
     preserve_previous_snapshots()
     populate_raw(raw_update)
@@ -266,7 +266,8 @@ def run_cycle(raw_update):
     evaluate_organisms()
     maintain_judge()
     route_effects()
-    render_projection()
+    if render:
+        render_projection()
 
 
 def preserve_previous_snapshots():
