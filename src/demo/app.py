@@ -17,6 +17,7 @@ import tkinter as tk
 IDLE = "IDLE"
 ARMED = "ARMED"
 DRAGGING = "DRAGGING"
+SELECTING = "SELECTING"
 
 START = "START"
 HOLD_RESOURCE = "HOLD-RESOURCE"
@@ -103,7 +104,8 @@ def reset_demo_state(event=None):
                     "fill": "#4e6e81",
                     "label": "CHARLIE",
                 },
-            }
+            },
+            "selected-objects": [],
         }
     )
 
@@ -146,6 +148,22 @@ def reset_demo_state(event=None):
                     "HELD": {},
                     "DATA": {},
                     "FN": organism_drag_object,
+                },
+                {
+                    "NAME": "marquee-select",
+                    "ACTIVE": True,
+                    "STATE": IDLE,
+                    "HELD": {},
+                    "DATA": {},
+                    "FN": organism_marquee_select,
+                },
+                {
+                    "NAME": "drag-selection-group",
+                    "ACTIVE": True,
+                    "STATE": IDLE,
+                    "HELD": {},
+                    "DATA": {},
+                    "FN": organism_drag_selection_group,
                 },
             ],
         }
@@ -344,14 +362,22 @@ def tokenizer_pointer_target(tokenizer):
 def tokenizer_drag_threshold(tokenizer):
     """Derive when the pointer has moved far enough for dragging to count."""
     derived = system["DERIVED"]
-    drag = find_organism("drag-object")
+    if derived["button-1-pressed"]:
+        tokenizer["DATA"]["press-point"] = {"x": system["RAW"]["x"], "y": system["RAW"]["y"]}
+        tokenizer["DATA"]["crossed"] = False
 
-    if drag["STATE"] != ARMED:
+    if derived["button-1-released"]:
+        tokenizer["DATA"]["press-point"] = None
         tokenizer["DATA"]["crossed"] = False
         derived["drag-threshold-crossed"] = False
         return
 
-    anchor = drag["DATA"]["press-point"]
+    anchor = tokenizer["DATA"].get("press-point")
+    if not anchor or not system["RAW"]["button-1-down"]:
+        tokenizer["DATA"]["crossed"] = False
+        derived["drag-threshold-crossed"] = False
+        return
+
     dx = system["RAW"]["x"] - anchor["x"]
     dy = system["RAW"]["y"] - anchor["y"]
     crossed = (dx * dx + dy * dy) >= (DRAG_THRESHOLD * DRAG_THRESHOLD)
@@ -365,24 +391,61 @@ def maintain_judge():
     coordination["judge-notes"] = []
 
     drag = find_organism("drag-object")
+    marquee = find_organism("marquee-select")
+    drag_group = find_organism("drag-selection-group")
     hover = find_organism("hover-highlight")
     held_object = drag["HELD"].get("object-id")
+    held_group = drag_group["HELD"].get("object-ids", [])
     lease = coordination["leases"].get("drag-object")
+    marquee_lease = coordination["leases"].get("marquee-select")
+    group_lease = coordination["leases"].get("drag-selection-group")
     coordination["hover-target"] = hover["HELD"].get("object-id")
+
+    if drag_group["STATE"] == DRAGGING and held_group:
+        coordination["pointer-owner"] = "drag-selection-group"
+        coordination["active-gesture"] = "drag-selection-group"
+        coordination["resource-holds"] = {object_id: "drag-selection-group" for object_id in held_group}
+        coordination["leases"] = {
+            "drag-selection-group": {
+                "resource": list(held_group),
+                "kind": "exclusive",
+                "valid": True,
+            }
+        }
+        return
 
     if drag["STATE"] == DRAGGING and held_object and held_object in world["objects"]:
         coordination["pointer-owner"] = "drag-object"
         coordination["active-gesture"] = "drag-object"
         coordination["resource-holds"] = {held_object: "drag-object"}
-        coordination["leases"]["drag-object"] = {
-            "resource": held_object,
-            "kind": "exclusive",
-            "valid": True,
+        coordination["leases"] = {
+            "drag-object": {
+                "resource": held_object,
+                "kind": "exclusive",
+                "valid": True,
+            }
+        }
+        return
+
+    if marquee["STATE"] == SELECTING:
+        coordination["pointer-owner"] = "marquee-select"
+        coordination["active-gesture"] = "marquee-select"
+        coordination["resource-holds"] = {}
+        coordination["leases"] = {
+            "marquee-select": {
+                "resource": "pointer",
+                "kind": "exclusive",
+                "valid": True,
+            }
         }
         return
 
     if lease:
         coordination["judge-notes"].append("released stale drag lease")
+    if group_lease:
+        coordination["judge-notes"].append("released stale group-drag lease")
+    if marquee_lease:
+        coordination["judge-notes"].append("released stale marquee lease")
 
     coordination["pointer-owner"] = None
     coordination["active-gesture"] = None
@@ -440,17 +503,55 @@ def organism_drag_object(organism):
     organism["DATA"] = {}
 
 
+def organism_marquee_select(organism):
+    """Recognize drag-selection beginning from empty space."""
+    if organism["STATE"] == IDLE:
+        handle_marquee_idle_state(organism)
+        return
+
+    if organism["STATE"] == ARMED:
+        handle_marquee_armed_state(organism)
+        return
+
+    if organism["STATE"] == SELECTING:
+        handle_marquee_selecting_state(organism)
+        return
+
+    clear_organism(organism)
+
+
+def organism_drag_selection_group(organism):
+    """Recognize dragging of the current selected object group."""
+    if organism["STATE"] == IDLE:
+        handle_group_drag_idle_state(organism)
+        return
+
+    if organism["STATE"] == ARMED:
+        handle_group_drag_armed_state(organism)
+        return
+
+    if organism["STATE"] == DRAGGING:
+        handle_group_dragging_state(organism)
+        return
+
+    clear_organism(organism)
+
+
 def handle_drag_idle_state(organism):
     """Begin an armed drag candidate when press occurs over an object."""
     derived = system["DERIVED"]
     target = derived["pointer-target"]
     if not derived["button-1-pressed"] or not target:
         return
+    if target in world["selected-objects"]:
+        return
 
     organism["HELD"] = {"object-id": target}
     if not get_permission(START):
-        organism["HELD"] = {}
+        clear_organism(organism)
         return
+
+    emit_world_effect("drag-object", "set-selection", {"object-ids": [target]})
 
     obj = world["objects"][target]
     organism["STATE"] = ARMED
@@ -468,18 +569,19 @@ def handle_drag_armed_state(organism):
     derived = system["DERIVED"]
 
     if derived["button-1-released"]:
-        organism["STATE"] = IDLE
-        organism["HELD"] = {}
-        organism["DATA"] = {}
+        emit_world_effect(
+            "drag-object",
+            "set-selection",
+            {"object-ids": [organism["HELD"]["object-id"]]},
+        )
+        clear_organism(organism)
         return
 
     if not derived["drag-threshold-crossed"]:
         return
 
     if not get_permission(HOLD_RESOURCE):
-        organism["STATE"] = IDLE
-        organism["HELD"] = {}
-        organism["DATA"] = {}
+        clear_organism(organism)
         return
 
     organism["STATE"] = DRAGGING
@@ -510,9 +612,127 @@ def handle_dragging_state(organism):
     )
 
     if system["DERIVED"]["button-1-released"]:
-        organism["STATE"] = IDLE
-        organism["HELD"] = {}
-        organism["DATA"] = {}
+        clear_organism(organism)
+
+
+def handle_marquee_idle_state(organism):
+    """Arm marquee selection when button 1 is pressed on empty space."""
+    derived = system["DERIVED"]
+    if not derived["button-1-pressed"]:
+        return
+    if derived["pointer-target"] is not None:
+        return
+
+    organism["HELD"] = {"gesture": "marquee-select"}
+    if not get_permission(START):
+        clear_organism(organism)
+        return
+
+    organism["STATE"] = ARMED
+    organism["DATA"] = {"press-point": {"x": system["RAW"]["x"], "y": system["RAW"]["y"]}}
+
+
+def handle_marquee_armed_state(organism):
+    """Wait until drag intent is clear before beginning rectangle selection."""
+    derived = system["DERIVED"]
+    if derived["button-1-released"]:
+        emit_world_effect("marquee-select", "set-selection", {"object-ids": []})
+        clear_organism(organism)
+        return
+
+    if not derived["drag-threshold-crossed"]:
+        return
+
+    organism["STATE"] = SELECTING
+
+
+def handle_marquee_selecting_state(organism):
+    """Emit marquee preview and commit selection on release."""
+    rect = rect_from_points(organism["DATA"]["press-point"], system["RAW"])
+    hits = list_objects_in_rect(rect)
+
+    organism["HELD"] = {"gesture": "marquee-select", "object-ids": hits}
+    emit_projection_effect("marquee-select", "selection-rectangle", {"rect": rect, "object-ids": hits})
+
+    if not system["DERIVED"]["button-1-released"]:
+        return
+
+    emit_world_effect("marquee-select", "set-selection", {"object-ids": hits})
+    clear_organism(organism)
+
+
+def handle_group_drag_idle_state(organism):
+    """Arm group dragging when press begins on a selected object."""
+    derived = system["DERIVED"]
+    target = derived["pointer-target"]
+    selected = world["selected-objects"]
+    if not derived["button-1-pressed"] or not target:
+        return
+    if target not in selected:
+        return
+
+    organism["HELD"] = {"object-ids": list(selected), "lead-object-id": target}
+    if not get_permission(START):
+        clear_organism(organism)
+        return
+
+    organism["STATE"] = ARMED
+    organism["DATA"] = {
+        "press-point": {"x": system["RAW"]["x"], "y": system["RAW"]["y"]},
+        "start-positions": snapshot_object_positions(selected),
+    }
+
+
+def handle_group_drag_armed_state(organism):
+    """Wait for threshold crossing before claiming the whole group."""
+    derived = system["DERIVED"]
+    if derived["button-1-released"]:
+        emit_world_effect(
+            "drag-selection-group",
+            "set-selection",
+            {"object-ids": [organism["HELD"]["lead-object-id"]]},
+        )
+        clear_organism(organism)
+        return
+
+    if not derived["drag-threshold-crossed"]:
+        return
+
+    if not get_permission(HOLD_RESOURCE):
+        clear_organism(organism)
+        return
+
+    organism["STATE"] = DRAGGING
+
+
+def handle_group_dragging_state(organism):
+    """Move the selected group as one coordinated bundle."""
+    press = organism["DATA"]["press-point"]
+    dx = system["RAW"]["x"] - press["x"]
+    dy = system["RAW"]["y"] - press["y"]
+
+    emit_world_effect(
+        "drag-selection-group",
+        "move-selection-group",
+        {
+            "object-ids": list(organism["HELD"]["object-ids"]),
+            "start-positions": organism["DATA"]["start-positions"],
+            "dx": dx,
+            "dy": dy,
+        },
+    )
+    emit_projection_effect(
+        "drag-selection-group",
+        "drag-anchor",
+        {
+            "object-id": organism["HELD"]["lead-object-id"],
+            "pointer-x": system["RAW"]["x"],
+            "pointer-y": system["RAW"]["y"],
+        },
+    )
+
+    if system["DERIVED"]["button-1-released"]:
+        clear_organism(organism)
 
 
 def get_permission(request):
@@ -522,37 +742,72 @@ def get_permission(request):
     organism = find_organism(current)
 
     if request == START:
-        target = organism["HELD"].get("object-id")
-        if current != "drag-object":
-            return False
         if coordination["pointer-owner"] not in (None, current):
             coordination["judge-notes"].append("denied START: pointer already owned")
             return False
-        if target in coordination["resource-holds"]:
-            coordination["judge-notes"].append("denied START: resource already held")
-            return False
-        return True
+        if current == "drag-object":
+            target = organism["HELD"].get("object-id")
+            if target in coordination["resource-holds"]:
+                coordination["judge-notes"].append("denied START: resource already held")
+                return False
+            return True
+        if current == "drag-selection-group":
+            for object_id in organism["HELD"].get("object-ids", []):
+                if object_id in coordination["resource-holds"]:
+                    coordination["judge-notes"].append("denied START: selected resource already held")
+                    return False
+            return True
+        if current == "marquee-select":
+            return True
+        return False
 
     if request == HOLD_RESOURCE:
-        target = organism["HELD"].get("object-id")
-        if current != "drag-object":
-            return False
-        if target not in world["objects"]:
-            coordination["judge-notes"].append("denied HOLD-RESOURCE: missing object")
-            return False
-        if coordination["pointer-owner"] not in (None, current):
-            coordination["judge-notes"].append("denied HOLD-RESOURCE: pointer contested")
-            return False
+        if current == "drag-object":
+            target = organism["HELD"].get("object-id")
+            if target not in world["objects"]:
+                coordination["judge-notes"].append("denied HOLD-RESOURCE: missing object")
+                return False
+            if coordination["pointer-owner"] not in (None, current):
+                coordination["judge-notes"].append("denied HOLD-RESOURCE: pointer contested")
+                return False
 
-        coordination["pointer-owner"] = current
-        coordination["active-gesture"] = current
-        coordination["resource-holds"] = {target: current}
-        coordination["leases"][current] = {
-            "resource": target,
-            "kind": "exclusive",
-            "valid": True,
-        }
-        return True
+            coordination["pointer-owner"] = current
+            coordination["active-gesture"] = current
+            coordination["resource-holds"] = {target: current}
+            coordination["leases"][current] = {
+                "resource": target,
+                "kind": "exclusive",
+                "valid": True,
+            }
+            return True
+
+        if current == "drag-selection-group":
+            object_ids = organism["HELD"].get("object-ids", [])
+            if not object_ids:
+                coordination["judge-notes"].append("denied HOLD-RESOURCE: empty selection")
+                return False
+            for object_id in object_ids:
+                if object_id not in world["objects"]:
+                    coordination["judge-notes"].append("denied HOLD-RESOURCE: selected object missing")
+                    return False
+            if coordination["pointer-owner"] not in (None, current):
+                coordination["judge-notes"].append("denied HOLD-RESOURCE: pointer contested")
+                return False
+
+            coordination["pointer-owner"] = current
+            coordination["active-gesture"] = current
+            coordination["resource-holds"] = {object_id: current for object_id in object_ids}
+            coordination["leases"][current] = {
+                "resource": list(object_ids),
+                "kind": "exclusive",
+                "valid": True,
+            }
+            return True
+
+        if current == "marquee-select":
+            return True
+
+        return False
 
     return False
 
@@ -567,12 +822,18 @@ def route_effects():
 def apply_world_effect(effect):
     """Mutate durable world state from a world-mutation effect."""
     payload = effect["payload"]
-    if effect["name"] != "move-object":
+    if effect["name"] == "move-object":
+        obj = world["objects"][payload["object-id"]]
+        obj["x"] = clamp(payload["x"], 20, PANEL_X - obj["w"] - 20)
+        obj["y"] = clamp(payload["y"], 20, CANVAS_H - obj["h"] - 20)
         return
 
-    obj = world["objects"][payload["object-id"]]
-    obj["x"] = clamp(payload["x"], 20, PANEL_X - obj["w"] - 20)
-    obj["y"] = clamp(payload["y"], 20, CANVAS_H - obj["h"] - 20)
+    if effect["name"] == "set-selection":
+        world["selected-objects"] = list(payload["object-ids"])
+        return
+
+    if effect["name"] == "move-selection-group":
+        apply_group_move_effect(payload)
 
 
 def emit_world_effect(source, name, payload):
@@ -636,8 +897,8 @@ def draw_world_objects():
             x2,
             y2,
             fill=obj["fill"],
-            outline="#24323a",
-            width=2,
+            outline=selection_outline_for_object(obj["id"]),
+            width=selection_width_for_object(obj["id"]),
         )
         canvas.create_text(
             x1 + 14,
@@ -660,6 +921,9 @@ def draw_preview_effects():
             continue
         if effect["name"] == "drag-anchor":
             draw_drag_anchor(effect["payload"])
+            continue
+        if effect["name"] == "selection-rectangle":
+            draw_selection_rectangle(effect["payload"])
 
 
 def draw_hover_outline(object_id):
@@ -689,6 +953,32 @@ def draw_drag_anchor(payload):
         dash=(6, 4),
         width=2,
     )
+
+
+def draw_selection_rectangle(payload):
+    """Draw the marquee selection rectangle and its current hit objects."""
+    rect = payload["rect"]
+    g["canvas"].create_rectangle(
+        rect["x1"],
+        rect["y1"],
+        rect["x2"],
+        rect["y2"],
+        outline="#1f4f7a",
+        width=2,
+        dash=(4, 3),
+    )
+
+    for object_id in payload["object-ids"]:
+        obj = world["objects"][object_id]
+        g["canvas"].create_rectangle(
+            obj["x"] - 6,
+            obj["y"] - 6,
+            obj["x"] + obj["w"] + 6,
+            obj["y"] + obj["h"] + 6,
+            outline="#1f4f7a",
+            width=2,
+            dash=(3, 2),
+        )
 
 
 def draw_divider():
@@ -731,6 +1021,8 @@ def build_panel_lines():
     derived = system["DERIVED"]
     coord = system["COORDINATION"]
     drag = find_organism("drag-object")
+    marquee = find_organism("marquee-select")
+    drag_group = find_organism("drag-selection-group")
     hover = find_organism("hover-highlight")
 
     return [
@@ -745,6 +1037,9 @@ def build_panel_lines():
         f"  entered={derived['entered-target']}  left={derived['left-target']}",
         f"  drag-threshold-crossed={derived['drag-threshold-crossed']}",
         "",
+        "WORLD",
+        f"  selected={world['selected-objects']}",
+        "",
         "COORDINATION",
         f"  pointer-owner={coord['pointer-owner']}",
         f"  active-gesture={coord['active-gesture']}",
@@ -753,12 +1048,14 @@ def build_panel_lines():
         "",
         "ORGANISMS",
         f"  hover-highlight STATE={hover['STATE']} HELD={hover['HELD']}",
+        f"  marquee-select  STATE={marquee['STATE']} HELD={marquee['HELD']}",
+        f"  drag-selection  STATE={drag_group['STATE']} HELD={drag_group['HELD']}",
         f"  drag-object     STATE={drag['STATE']} HELD={drag['HELD']}",
         "",
         "NOTES",
         "  ESC or r resets the demo",
-        "  Hover outlines are preview effects",
-        "  Drag motion is world mutation via routed effects",
+        "  Empty-space drag creates a marquee selection",
+        "  Drag a selected object to move the full group",
         f"  judge-notes={coord['judge-notes']}",
     ]
 
@@ -788,6 +1085,98 @@ def find_organism(name):
 def clamp(value, lower, upper):
     """Clamp a numeric value into an inclusive range."""
     return max(lower, min(upper, value))
+
+
+def clear_organism(organism):
+    """Return an organism to its empty resting condition."""
+    organism["STATE"] = IDLE
+    organism["HELD"] = {}
+    organism["DATA"] = {}
+
+
+def rect_from_points(p1, p2):
+    """Normalize two points into a rectangle dictionary."""
+    return {
+        "x1": min(p1["x"], p2["x"]),
+        "y1": min(p1["y"], p2["y"]),
+        "x2": max(p1["x"], p2["x"]),
+        "y2": max(p1["y"], p2["y"]),
+    }
+
+
+def list_objects_in_rect(rect):
+    """Return object ids whose rectangles intersect the marquee rectangle."""
+    hits = []
+    for object_id, obj in world["objects"].items():
+        if rect_intersects_object(rect, obj):
+            hits.append(object_id)
+    return hits
+
+
+def rect_intersects_object(rect, obj):
+    """Check whether a marquee rectangle intersects an object rectangle."""
+    return not (
+        rect["x2"] < obj["x"]
+        or rect["x1"] > obj["x"] + obj["w"]
+        or rect["y2"] < obj["y"]
+        or rect["y1"] > obj["y"] + obj["h"]
+    )
+
+
+def snapshot_object_positions(object_ids):
+    """Capture object positions for later relative group movement."""
+    positions = {}
+    for object_id in object_ids:
+        obj = world["objects"][object_id]
+        positions[object_id] = {"x": obj["x"], "y": obj["y"]}
+    return positions
+
+
+def apply_group_move_effect(payload):
+    """Move a selected object bundle while preserving relative offsets."""
+    start_positions = payload["start-positions"]
+    bounded_dx = compute_group_delta_bound(start_positions, payload["dx"], "x")
+    bounded_dy = compute_group_delta_bound(start_positions, payload["dy"], "y")
+
+    for object_id in payload["object-ids"]:
+        obj = world["objects"][object_id]
+        start = start_positions[object_id]
+        obj["x"] = start["x"] + bounded_dx
+        obj["y"] = start["y"] + bounded_dy
+
+
+def compute_group_delta_bound(start_positions, delta, axis):
+    """Clamp group translation so the full selection stays in bounds."""
+    lower_bound = None
+    upper_bound = None
+
+    for object_id, start in start_positions.items():
+        obj = world["objects"][object_id]
+        if axis == "x":
+            low = 20 - start["x"]
+            high = PANEL_X - obj["w"] - 20 - start["x"]
+        else:
+            low = 20 - start["y"]
+            high = CANVAS_H - obj["h"] - 20 - start["y"]
+
+        lower_bound = low if lower_bound is None else max(lower_bound, low)
+        upper_bound = high if upper_bound is None else min(upper_bound, high)
+
+    return clamp(delta, lower_bound, upper_bound)
+
+
+def selection_outline_for_object(object_id):
+    """Choose an outline color based on current selection state."""
+    if object_id in world["selected-objects"]:
+        return "#1f4f7a"
+    return "#24323a"
+
+
+def selection_width_for_object(object_id):
+    """Choose an outline width based on current selection state."""
+    if object_id in world["selected-objects"]:
+        return 4
+    return 2
 
 
 if __name__ == "__main__":
