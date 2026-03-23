@@ -10,6 +10,7 @@ This program demonstrates a tiny interactive ecology:
 from __future__ import annotations
 
 import copy
+import time
 import tkinter as tk
 
 
@@ -27,6 +28,7 @@ CANVAS_W = 980
 CANVAS_H = 640
 PANEL_X = 660
 DRAG_THRESHOLD = 8
+TICK_MS = 100
 
 g = {}
 world = {}
@@ -38,6 +40,7 @@ def main():
     build_app()
     reset_demo_state()
     render_projection()
+    schedule_periodic_tick()
     g["root"].mainloop()
 
 
@@ -154,7 +157,7 @@ def make_initial_raw():
     return {
         "x": 0,
         "y": 0,
-        "ms": 0,
+        "ms": now_ms(),
         "inside-canvas": True,
         "button-1-down": False,
         "mouse-over": None,
@@ -183,7 +186,6 @@ def handle_pointer_motion(event):
         {
             "x": event.x,
             "y": event.y,
-            "ms": event.time,
             "inside-canvas": True,
             "button-1-down": system["RAW"]["button-1-down"],
             "mouse-over": find_object_at(event.x, event.y),
@@ -197,7 +199,6 @@ def handle_button_1_press(event):
         {
             "x": event.x,
             "y": event.y,
-            "ms": event.time,
             "inside-canvas": True,
             "button-1-down": True,
             "mouse-over": find_object_at(event.x, event.y),
@@ -211,7 +212,6 @@ def handle_button_1_release(event):
         {
             "x": event.x,
             "y": event.y,
-            "ms": event.time,
             "inside-canvas": True,
             "button-1-down": False,
             "mouse-over": find_object_at(event.x, event.y),
@@ -225,7 +225,6 @@ def handle_pointer_leave_canvas(event):
         {
             "x": event.x,
             "y": event.y,
-            "ms": event.time,
             "inside-canvas": False,
             "button-1-down": system["RAW"]["button-1-down"],
             "mouse-over": None,
@@ -260,7 +259,30 @@ def preserve_previous_snapshots():
 
 def populate_raw(raw_update):
     """Install a normalized raw-input snapshot for the current cycle."""
-    system["RAW"] = raw_update
+    snapshot = dict(system["RAW"])
+    snapshot.update(raw_update)
+    snapshot["ms"] = now_ms()
+    if snapshot["inside-canvas"]:
+        snapshot["mouse-over"] = find_object_at(snapshot["x"], snapshot["y"])
+    else:
+        snapshot["mouse-over"] = None
+    system["RAW"] = snapshot
+
+
+def schedule_periodic_tick():
+    """Keep the architecture advancing even when no Tk input arrives."""
+    g["root"].after(TICK_MS, handle_periodic_tick)
+
+
+def handle_periodic_tick():
+    """Run one idle cycle so time-based organisms can progress."""
+    run_cycle({})
+    schedule_periodic_tick()
+
+
+def now_ms():
+    """Return a monotonic millisecond clock for temporal interaction logic."""
+    return int(time.monotonic() * 1000)
 
 
 def run_tokenizers():
