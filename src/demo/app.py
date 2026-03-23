@@ -51,6 +51,7 @@ def build_app():
     """Create the root window and canvas, and bind raw-input callbacks."""
     g["root"] = tk.Tk()
     g["root"].title("Interaction Architecture Blackboard-Judge Demo")
+    g["quantization-var"] = tk.BooleanVar(value=False)
     g["canvas"] = tk.Canvas(
         g["root"],
         width=CANVAS_W,
@@ -59,6 +60,14 @@ def build_app():
         highlightthickness=0,
     )
     g["canvas"].grid(row=0, column=0, sticky="nsew")
+    g["quantization-checkbox"] = tk.Checkbutton(
+        g["root"],
+        text="Quantize To Grid",
+        variable=g["quantization-var"],
+        command=handle_quantization_toggle,
+        anchor="w",
+    )
+    g["quantization-checkbox"].grid(row=1, column=0, sticky="w", padx=12, pady=(6, 10))
 
     g["root"].grid_columnconfigure(0, weight=1)
     g["root"].grid_rowconfigure(0, weight=1)
@@ -190,6 +199,8 @@ def make_initial_raw():
         "inside-canvas": True,
         "button-1-down": False,
         "mouse-over": None,
+        "quantization-enabled": False,
+        "quantization-step": 20,
     }
 
 
@@ -269,6 +280,11 @@ def handle_escape_reset(event):
     render_projection()
 
 
+def handle_quantization_toggle():
+    """Project checkbox state into RAW and redraw immediately."""
+    run_cycle({}, render=True)
+
+
 def run_cycle(raw_update, render=True):
     """Advance the architecture one cycle from raw input to projection."""
     preserve_previous_snapshots()
@@ -293,6 +309,8 @@ def populate_raw(raw_update):
     snapshot = dict(system["RAW"])
     snapshot.update(raw_update)
     snapshot["ms"] = now_ms()
+    if "quantization-enabled" not in raw_update:
+        snapshot["quantization-enabled"] = current_quantization_enabled()
     if snapshot["inside-canvas"]:
         snapshot["mouse-over"] = find_object_at(snapshot["x"], snapshot["y"])
     else:
@@ -314,6 +332,15 @@ def handle_periodic_tick():
 def now_ms():
     """Return a monotonic millisecond clock for temporal interaction logic."""
     return int(time.monotonic() * 1000)
+
+
+def current_quantization_enabled():
+    """Read quantization state from the UI when present, else from RAW."""
+    if "quantization-var" in g:
+        return bool(g["quantization-var"].get())
+    if system:
+        return bool(system["RAW"]["quantization-enabled"])
+    return False
 
 
 def run_tokenizers():
@@ -971,8 +998,14 @@ def apply_world_effect(effect):
     payload = effect["payload"]
     if effect["name"] == "move-object":
         obj = world["objects"][payload["object-id"]]
-        obj["x"] = clamp(payload["x"], 20, PANEL_X - obj["w"] - 20)
-        obj["y"] = clamp(payload["y"], 20, CANVAS_H - obj["h"] - 20)
+        x = payload["x"]
+        y = payload["y"]
+        if system["RAW"]["quantization-enabled"]:
+            step = system["RAW"]["quantization-step"]
+            x = snap_value(x, step)
+            y = snap_value(y, step)
+        obj["x"] = clamp(x, 20, PANEL_X - obj["w"] - 20)
+        obj["y"] = clamp(y, 20, CANVAS_H - obj["h"] - 20)
         return
 
     if effect["name"] == "set-selection":
@@ -1016,6 +1049,8 @@ def draw_background():
     """Paint the canvas background and demo title."""
     canvas = g["canvas"]
     canvas.create_rectangle(0, 0, CANVAS_W, CANVAS_H, fill="#f6f2e8", outline="")
+    if system["RAW"]["quantization-enabled"]:
+        draw_quantization_grid()
     canvas.create_text(
         28,
         20,
@@ -1032,6 +1067,16 @@ def draw_background():
         fill="#42525d",
         font=("TkDefaultFont", 10),
     )
+
+
+def draw_quantization_grid():
+    """Draw a light snap grid when quantization is enabled."""
+    step = system["RAW"]["quantization-step"]
+    canvas = g["canvas"]
+    for x in range(20, PANEL_X, step):
+        canvas.create_line(x, 0, x, CANVAS_H, fill="#e1dac8")
+    for y in range(20, CANVAS_H, step):
+        canvas.create_line(0, y, PANEL_X, y, fill="#e1dac8")
 
 
 def draw_world_objects():
@@ -1203,6 +1248,7 @@ def build_panel_lines():
         "RAW",
         f"  xy=({raw['x']}, {raw['y']})  inside={raw['inside-canvas']}",
         f"  b1-down={raw['button-1-down']}  target={raw['mouse-over']}",
+        f"  quantized={raw['quantization-enabled']}  step={raw['quantization-step']}",
         "",
         "DERIVED",
         f"  moving={derived['moving']}  dxdy=({derived['dx']}, {derived['dy']})",
@@ -1296,6 +1342,11 @@ def clamp(value, lower, upper):
     return max(lower, min(upper, value))
 
 
+def snap_value(value, step):
+    """Snap a numeric value to the nearest quantization step."""
+    return int(round(value / step) * step)
+
+
 def clear_organism(organism):
     """Return an organism to its empty resting condition."""
     organism["STATE"] = IDLE
@@ -1344,8 +1395,15 @@ def snapshot_object_positions(object_ids):
 def apply_group_move_effect(payload):
     """Move a selected object bundle while preserving relative offsets."""
     start_positions = payload["start-positions"]
-    bounded_dx = compute_group_delta_bound(start_positions, payload["dx"], "x")
-    bounded_dy = compute_group_delta_bound(start_positions, payload["dy"], "y")
+    dx = payload["dx"]
+    dy = payload["dy"]
+    if system["RAW"]["quantization-enabled"]:
+        step = system["RAW"]["quantization-step"]
+        dx = snap_value(dx, step)
+        dy = snap_value(dy, step)
+
+    bounded_dx = compute_group_delta_bound(start_positions, dx, "x")
+    bounded_dy = compute_group_delta_bound(start_positions, dy, "y")
 
     for object_id in payload["object-ids"]:
         obj = world["objects"][object_id]
@@ -1375,6 +1433,10 @@ def compute_resized_rect(start_rect, handle, pointer_x, pointer_y):
     top = start_rect["y"]
     right = start_rect["x"] + start_rect["w"]
     bottom = start_rect["y"] + start_rect["h"]
+    if system["RAW"]["quantization-enabled"]:
+        step = system["RAW"]["quantization-step"]
+        pointer_x = snap_value(pointer_x, step)
+        pointer_y = snap_value(pointer_y, step)
 
     if "w" in handle:
         left = clamp(pointer_x, 20, right - MIN_SIZE)

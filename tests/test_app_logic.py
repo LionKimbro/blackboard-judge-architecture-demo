@@ -19,7 +19,7 @@ def setup_demo(monkeypatch):
     return clock
 
 
-def cycle(x=None, y=None, button_1_down=None, inside_canvas=None):
+def cycle(x=None, y=None, button_1_down=None, inside_canvas=None, quantization_enabled=None):
     raw_update = {}
     if x is not None:
         raw_update["x"] = x
@@ -29,6 +29,8 @@ def cycle(x=None, y=None, button_1_down=None, inside_canvas=None):
         raw_update["button-1-down"] = button_1_down
     if inside_canvas is not None:
         raw_update["inside-canvas"] = inside_canvas
+    if quantization_enabled is not None:
+        raw_update["quantization-enabled"] = quantization_enabled
     app.run_cycle(raw_update, render=False)
 
 
@@ -233,3 +235,54 @@ def test_resize_clamps_to_playfield_bounds(monkeypatch):
     assert alpha["y"] == 20
     assert alpha["w"] == 190
     assert alpha["h"] == 170
+
+
+def test_quantization_state_projects_into_raw(monkeypatch):
+    setup_demo(monkeypatch)
+
+    cycle(quantization_enabled=True)
+
+    assert app.system["RAW"]["quantization-enabled"] is True
+    assert app.system["RAW"]["quantization-step"] == 20
+
+
+def test_quantized_single_drag_snaps_to_grid(monkeypatch):
+    setup_demo(monkeypatch)
+    cycle(quantization_enabled=True)
+
+    drag_single(100, 120, 183, 207)
+
+    alpha = app.world["objects"]["alpha"]
+    assert alpha["x"] == 160
+    assert alpha["y"] == 180
+
+
+def test_quantized_group_drag_snaps_delta(monkeypatch):
+    setup_demo(monkeypatch)
+    marquee_select(40, 60, 450, 360)
+    cycle(quantization_enabled=True)
+
+    press(120, 120)
+    move(173, 166)
+    release(173, 166)
+
+    alpha = app.world["objects"]["alpha"]
+    bravo = app.world["objects"]["bravo"]
+    assert alpha["x"] == 130
+    assert alpha["y"] == 130
+    assert bravo["x"] == 330
+    assert bravo["y"] == 260
+
+
+def test_quantized_resize_snaps_edges(monkeypatch):
+    setup_demo(monkeypatch)
+    select_alpha()
+    cycle(quantization_enabled=True)
+
+    drag_resize_handle("alpha", "se", 247, 219)
+
+    alpha = app.world["objects"]["alpha"]
+    assert alpha["x"] == 70
+    assert alpha["y"] == 90
+    assert alpha["w"] == 170
+    assert alpha["h"] == 130
