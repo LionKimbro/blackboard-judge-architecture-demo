@@ -458,55 +458,19 @@ def maintain_judge():
     coordination["hover-target"] = hover["HELD"].get("object-id")
 
     if resize["STATE"] == DRAGGING and resize_object and resize_object in world["objects"]:
-        coordination["pointer-owner"] = "resize-object"
-        coordination["active-gesture"] = "resize-object"
-        coordination["resource-holds"] = {resize_object: "resize-object"}
-        coordination["leases"] = {
-            "resize-object": {
-                "resource": resize_object,
-                "kind": "exclusive",
-                "valid": True,
-            }
-        }
+        set_exclusive_coordination("resize-object", resize_object)
         return
 
     if drag_group["STATE"] == DRAGGING and held_group:
-        coordination["pointer-owner"] = "drag-selection-group"
-        coordination["active-gesture"] = "drag-selection-group"
-        coordination["resource-holds"] = {object_id: "drag-selection-group" for object_id in held_group}
-        coordination["leases"] = {
-            "drag-selection-group": {
-                "resource": list(held_group),
-                "kind": "exclusive",
-                "valid": True,
-            }
-        }
+        set_exclusive_coordination("drag-selection-group", list(held_group))
         return
 
     if drag["STATE"] == DRAGGING and held_object and held_object in world["objects"]:
-        coordination["pointer-owner"] = "drag-object"
-        coordination["active-gesture"] = "drag-object"
-        coordination["resource-holds"] = {held_object: "drag-object"}
-        coordination["leases"] = {
-            "drag-object": {
-                "resource": held_object,
-                "kind": "exclusive",
-                "valid": True,
-            }
-        }
+        set_exclusive_coordination("drag-object", held_object)
         return
 
     if marquee["STATE"] == SELECTING:
-        coordination["pointer-owner"] = "marquee-select"
-        coordination["active-gesture"] = "marquee-select"
-        coordination["resource-holds"] = {}
-        coordination["leases"] = {
-            "marquee-select": {
-                "resource": "pointer",
-                "kind": "exclusive",
-                "valid": True,
-            }
-        }
+        set_pointer_coordination("marquee-select", "pointer")
         return
 
     if lease:
@@ -518,6 +482,63 @@ def maintain_judge():
     if marquee_lease:
         coordination["judge-notes"].append("released stale marquee lease")
 
+    clear_coordination_claims()
+
+
+def may_claim_pointer(organism_name, denial_note="denied START: pointer already owned"):
+    """Check whether an organism may claim pointer ownership right now."""
+    coordination = system["COORDINATION"]
+    if coordination["pointer-owner"] in (None, organism_name):
+        return True
+    coordination["judge-notes"].append(denial_note)
+    return False
+
+
+def are_any_resources_held(resource_ids):
+    """Return true when any resource in the list is already authoritatively held."""
+    coordination = system["COORDINATION"]
+    for resource_id in resource_ids:
+        if resource_id in coordination["resource-holds"]:
+            return True
+    return False
+
+
+def set_pointer_coordination(owner, resource):
+    """Write an exclusive pointer claim with no object resource holds."""
+    coordination = system["COORDINATION"]
+    coordination["pointer-owner"] = owner
+    coordination["active-gesture"] = owner
+    coordination["resource-holds"] = {}
+    coordination["leases"] = {
+        owner: {
+            "resource": resource,
+            "kind": "exclusive",
+            "valid": True,
+        }
+    }
+
+
+def set_exclusive_coordination(owner, resource):
+    """Write exclusive coordination for one object or a bundle of objects."""
+    coordination = system["COORDINATION"]
+    coordination["pointer-owner"] = owner
+    coordination["active-gesture"] = owner
+    if isinstance(resource, list):
+        coordination["resource-holds"] = {resource_id: owner for resource_id in resource}
+    else:
+        coordination["resource-holds"] = {resource: owner}
+    coordination["leases"] = {
+        owner: {
+            "resource": resource,
+            "kind": "exclusive",
+            "valid": True,
+        }
+    }
+
+
+def clear_coordination_claims():
+    """Clear active pointer ownership, gesture, and resource leases."""
+    coordination = system["COORDINATION"]
     coordination["pointer-owner"] = None
     coordination["active-gesture"] = None
     coordination["resource-holds"] = {}
@@ -891,26 +912,24 @@ def get_permission(request):
     organism = find_organism(current)
 
     if request == START:
-        if coordination["pointer-owner"] not in (None, current):
-            coordination["judge-notes"].append("denied START: pointer already owned")
+        if not may_claim_pointer(current):
             return False
         if current == "resize-object":
             target = organism["HELD"].get("object-id")
-            if target in coordination["resource-holds"]:
+            if are_any_resources_held([target]):
                 coordination["judge-notes"].append("denied START: resize target already held")
                 return False
             return True
         if current == "drag-object":
             target = organism["HELD"].get("object-id")
-            if target in coordination["resource-holds"]:
+            if are_any_resources_held([target]):
                 coordination["judge-notes"].append("denied START: resource already held")
                 return False
             return True
         if current == "drag-selection-group":
-            for object_id in organism["HELD"].get("object-ids", []):
-                if object_id in coordination["resource-holds"]:
-                    coordination["judge-notes"].append("denied START: selected resource already held")
-                    return False
+            if are_any_resources_held(organism["HELD"].get("object-ids", [])):
+                coordination["judge-notes"].append("denied START: selected resource already held")
+                return False
             return True
         if current == "marquee-select":
             return True
@@ -922,18 +941,9 @@ def get_permission(request):
             if target not in world["objects"]:
                 coordination["judge-notes"].append("denied HOLD-RESOURCE: missing resize target")
                 return False
-            if coordination["pointer-owner"] not in (None, current):
-                coordination["judge-notes"].append("denied HOLD-RESOURCE: pointer contested")
+            if not may_claim_pointer(current, "denied HOLD-RESOURCE: pointer contested"):
                 return False
-
-            coordination["pointer-owner"] = current
-            coordination["active-gesture"] = current
-            coordination["resource-holds"] = {target: current}
-            coordination["leases"][current] = {
-                "resource": target,
-                "kind": "exclusive",
-                "valid": True,
-            }
+            set_exclusive_coordination(current, target)
             return True
 
         if current == "drag-object":
@@ -941,18 +951,9 @@ def get_permission(request):
             if target not in world["objects"]:
                 coordination["judge-notes"].append("denied HOLD-RESOURCE: missing object")
                 return False
-            if coordination["pointer-owner"] not in (None, current):
-                coordination["judge-notes"].append("denied HOLD-RESOURCE: pointer contested")
+            if not may_claim_pointer(current, "denied HOLD-RESOURCE: pointer contested"):
                 return False
-
-            coordination["pointer-owner"] = current
-            coordination["active-gesture"] = current
-            coordination["resource-holds"] = {target: current}
-            coordination["leases"][current] = {
-                "resource": target,
-                "kind": "exclusive",
-                "valid": True,
-            }
+            set_exclusive_coordination(current, target)
             return True
 
         if current == "drag-selection-group":
@@ -964,18 +965,9 @@ def get_permission(request):
                 if object_id not in world["objects"]:
                     coordination["judge-notes"].append("denied HOLD-RESOURCE: selected object missing")
                     return False
-            if coordination["pointer-owner"] not in (None, current):
-                coordination["judge-notes"].append("denied HOLD-RESOURCE: pointer contested")
+            if not may_claim_pointer(current, "denied HOLD-RESOURCE: pointer contested"):
                 return False
-
-            coordination["pointer-owner"] = current
-            coordination["active-gesture"] = current
-            coordination["resource-holds"] = {object_id: current for object_id in object_ids}
-            coordination["leases"][current] = {
-                "resource": list(object_ids),
-                "kind": "exclusive",
-                "valid": True,
-            }
+            set_exclusive_coordination(current, list(object_ids))
             return True
 
         if current == "marquee-select":
