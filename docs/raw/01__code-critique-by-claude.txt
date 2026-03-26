@@ -1,0 +1,10 @@
+title: Specific Code Critique by Claude
+commitcritiqued: 094204c0239cca98ba4a61c8e2a8319ccbffbbed
+date: 2026-03-23
+
+Looking at the current code, there are a few specific discipline problems to fix:
+HELD is doing double duty. In organism_drag_object, the organism sets organism["HELD"] = {"object-id": target} before calling get_permission, which is correct intent. But HELD also gets written during active gestures as working state — it accumulates things the organism needs, not just things the judge needs to see. The fix is to be strict: HELD is only ever written to declare a claim. Anything else goes in DATA.
+get_permission reaches past HELD. In several places it does things like organism["HELD"].get("object-ids", []) which is fine, but it also calls find_organism(current) to get the organism and then reads from it — meaning the judge is navigating to the organism itself rather than receiving a declaration. The cleaner form is that get_permission receives what it needs as arguments, or reads only from a canonical HELD structure, without needing to look up the organism independently.
+The judge reads organism STATE directly. In maintain_judge, lines like if resize["STATE"] == DRAGGING mean the judge is inspecting internal organism state, not just declarations. STATE is private. What the judge should see is what the organism is claiming, not what phase it's in internally. If the judge needs to know a gesture is active, that should be expressed in HELD — an active claim present in HELD means the gesture is live.
+The coordination vocabulary isn't named. The primitives may_claim_pointer and are_any_resources_held exist, which is good — but set_exclusive_coordination, set_pointer_coordination, and clear_coordination_claims are doing compound work that's called from both the judge and from get_permission. Making that vocabulary explicit and stable would make the judge's policy logic more readable as it grows.
+So concretely: audit every place the judge or get_permission touches anything other than HELD and the coordination block, and ask whether that information should instead be surfaced as a HELD declaration. That's the discipline check.

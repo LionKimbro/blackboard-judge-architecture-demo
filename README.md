@@ -12,6 +12,10 @@ The demo keeps the architecture explicit:
 - the judge authoritatively maintains `COORDINATION`
 - effects route separately into world mutation and projection preview
 
+## Screenshot
+
+![Blackboard Judge Demo Screenshot](docs/img/screenshot-1.png)
+
 ## Run
 
 ```powershell

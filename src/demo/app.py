@@ -658,7 +658,13 @@ def handle_drag_idle_state(organism):
         return
 
     organism["HELD"] = {"object-id": target}
-    if not get_permission(START):
+    if not get_permission(
+        START,
+        {
+            "gesture": "drag-object",
+            "resources": [target],
+        },
+    ):
         clear_organism(organism)
         return
 
@@ -691,7 +697,14 @@ def handle_drag_armed_state(organism):
     if not derived["drag-threshold-crossed"]:
         return
 
-    if not get_permission(HOLD_RESOURCE):
+    if not get_permission(
+        HOLD_RESOURCE,
+        {
+            "gesture": "drag-object",
+            "resources": [organism["HELD"]["object-id"]],
+            "kind": "exclusive",
+        },
+    ):
         clear_organism(organism)
         return
 
@@ -734,7 +747,14 @@ def handle_resize_idle_state(organism):
         return
 
     organism["HELD"] = {"object-id": target["object-id"], "handle": target["handle"]}
-    if not get_permission(START):
+    if not get_permission(
+        START,
+        {
+            "gesture": "resize-object",
+            "resources": [target["object-id"]],
+            "handle": target["handle"],
+        },
+    ):
         clear_organism(organism)
         return
 
@@ -756,7 +776,15 @@ def handle_resize_armed_state(organism):
     if not derived["drag-threshold-crossed"]:
         return
 
-    if not get_permission(HOLD_RESOURCE):
+    if not get_permission(
+        HOLD_RESOURCE,
+        {
+            "gesture": "resize-object",
+            "resources": [organism["HELD"]["object-id"]],
+            "kind": "exclusive",
+            "handle": organism["HELD"]["handle"],
+        },
+    ):
         clear_organism(organism)
         return
 
@@ -792,7 +820,13 @@ def handle_marquee_idle_state(organism):
         return
 
     organism["HELD"] = {"gesture": "marquee-select"}
-    if not get_permission(START):
+    if not get_permission(
+        START,
+        {
+            "gesture": "marquee-select",
+            "resource": "pointer",
+        },
+    ):
         clear_organism(organism)
         return
 
@@ -842,7 +876,14 @@ def handle_group_drag_idle_state(organism):
         return
 
     organism["HELD"] = {"object-ids": list(selected), "lead-object-id": target}
-    if not get_permission(START):
+    if not get_permission(
+        START,
+        {
+            "gesture": "drag-selection-group",
+            "resources": list(selected),
+            "lead-object-id": target,
+        },
+    ):
         clear_organism(organism)
         return
 
@@ -868,7 +909,14 @@ def handle_group_drag_armed_state(organism):
     if not derived["drag-threshold-crossed"]:
         return
 
-    if not get_permission(HOLD_RESOURCE):
+    if not get_permission(
+        HOLD_RESOURCE,
+        {
+            "gesture": "drag-selection-group",
+            "resources": list(organism["HELD"]["object-ids"]),
+            "kind": "exclusive",
+        },
+    ):
         clear_organism(organism)
         return
 
@@ -905,29 +953,27 @@ def handle_group_dragging_state(organism):
         clear_organism(organism)
 
 
-def get_permission(request):
+def get_permission(request, params):
     """Judge whether the current organism may start or hold a resource."""
     current = system["CURRENT-ORGANISM"]
     coordination = system["COORDINATION"]
-    organism = find_organism(current)
+    resources = params.get("resources", [])
 
     if request == START:
         if not may_claim_pointer(current):
             return False
         if current == "resize-object":
-            target = organism["HELD"].get("object-id")
-            if are_any_resources_held([target]):
+            if are_any_resources_held(resources):
                 coordination["judge-notes"].append("denied START: resize target already held")
                 return False
             return True
         if current == "drag-object":
-            target = organism["HELD"].get("object-id")
-            if are_any_resources_held([target]):
+            if are_any_resources_held(resources):
                 coordination["judge-notes"].append("denied START: resource already held")
                 return False
             return True
         if current == "drag-selection-group":
-            if are_any_resources_held(organism["HELD"].get("object-ids", [])):
+            if are_any_resources_held(resources):
                 coordination["judge-notes"].append("denied START: selected resource already held")
                 return False
             return True
@@ -937,7 +983,7 @@ def get_permission(request):
 
     if request == HOLD_RESOURCE:
         if current == "resize-object":
-            target = organism["HELD"].get("object-id")
+            target = resources[0]
             if target not in world["objects"]:
                 coordination["judge-notes"].append("denied HOLD-RESOURCE: missing resize target")
                 return False
@@ -947,7 +993,7 @@ def get_permission(request):
             return True
 
         if current == "drag-object":
-            target = organism["HELD"].get("object-id")
+            target = resources[0]
             if target not in world["objects"]:
                 coordination["judge-notes"].append("denied HOLD-RESOURCE: missing object")
                 return False
@@ -957,7 +1003,7 @@ def get_permission(request):
             return True
 
         if current == "drag-selection-group":
-            object_ids = organism["HELD"].get("object-ids", [])
+            object_ids = resources
             if not object_ids:
                 coordination["judge-notes"].append("denied HOLD-RESOURCE: empty selection")
                 return False

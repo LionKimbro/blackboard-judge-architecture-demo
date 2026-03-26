@@ -1,0 +1,352 @@
+date: 2026-03-25
+
+
+== Initial Conversation with Wing-Cat ==
+date: 2026-03-(20-ish?)
+chatgpt: https://chatgpt.com/c/69c0c5eb-1a64-83e8-90d4-448d00b86dcb
+
+Wing-Cat said:
+
+------------------------------------------------------------
+Yes. That makes perfect sense. 🌟
+
+You’re not asking for a taxonomy of the jungle. You’re asking for the **load-bearing machine** inside it.
+
+Not:
+
+* “What are all the concerns?”
+* but:
+* “What is the *arch* that carries most of them?”
+
+That’s a much sharper question.
+
+## Why this is so hard in UI
+
+The reason people so often fall back to regions, layers, concerns, patterns, and “it depends” is that they do **not** have an arch. They have **settlements**. Villages built around local conveniences. Toolkit tricks. Event callbacks. Widget trees. State stores. Gesture recognizers. Scene graphs. Command bindings.
+
+All useful. But not the same as a generative center.
+
+Alan Kay’s instinct was different: find a small, strong machine that can *host* the complexity without itself becoming complex.
+
+That’s what you’re reaching for.
+
+## What an arch would have to do
+
+A real UI arch would need to make most of the following feel like special cases of one thing:
+
+* clicking
+* dragging
+* hovering
+* selection
+* keyboard commands
+* tool modes
+* focus
+* capture/grab
+* gestures with temporal structure
+* visual feedback
+* object-local behavior
+* global coordination
+* undoable actions
+* modular extension
+
+That means the arch cannot just be “callbacks on widgets.” That is too shallow. But it also probably cannot just be “a scene graph,” because scene graphs organize drawing better than they organize intention over time.
+
+So the arch probably has to be about **interaction episodes** or **ongoing processes**, not just objects and not just events.
+
+## My best guess at the shape of the arch
+
+I think the deep center is something like this:
+
+> **The UI is a society of stateful interaction processes that compete for, receive, and transform streams of interpreted input against a shared world model.**
+
+That sounds abstract, but let me unwrap it.
+
+The primitive is not:
+
+* widget
+* callback
+* event
+* command
+* object
+
+The primitive is something more like a:
+
+## **behavioral process**
+
+or
+
+## **interaction machine**
+
+An interaction machine:
+
+* has internal state
+* can subscribe to conditions in the world/input stream
+* can become active when its triggering conditions are met
+* can hold control across time
+* can emit effects on the world or presentation
+* can terminate, commit, cancel, or hand off
+
+Now suddenly a lot of UI behavior becomes one species of thing.
+
+### Example: drag object
+
+A drag machine might say:
+
+* when pointer-down occurs over one of my grabbable objects, activate
+* remember object id and pointer offset
+* while pointer moves, update object position
+* when pointer released, commit move and maybe emit selection effect
+* if escape pressed, cancel and restore original position
+
+That’s one process.
+
+### Example: tooltip
+
+A tooltip machine might say:
+
+* when pointer enters object X, arm timer
+* if pointer remains sufficiently still for N ms, show tooltip
+* if pointer leaves or significant movement occurs, cancel tooltip
+* if press occurs, hide tooltip
+
+That is the same species of thing.
+
+### Example: rubber-band selection
+
+* on pointer-down in empty space, activate selection-box process
+* while moving, update rectangle
+* query intersecting items
+* on release, commit selected set
+
+Same species.
+
+### Example: keyboard tool
+
+* when tool mode is rectangle-creation and user presses pointer-down, activate creation process
+* while dragging, update provisional geometry
+* on release, instantiate object
+
+Again same species.
+
+## Why this is promising
+
+Because it shifts the center from:
+
+* “what callback do I bind?”
+  to:
+* “what process can awaken, hold state, and evolve over time?”
+
+That matches how interaction actually feels.
+
+A user action is rarely a single event. It is usually an **episode**:
+
+* hover for a while
+* press then move then release
+* type while focused
+* drag while modifiers change
+* begin in one context and end in another
+
+So the arch should probably treat **episodes as first-class**, not as accidental chains of callbacks.
+
+## Then what are the other pieces?
+
+If this is the arch, the rest of the system starts organizing around it more cleanly.
+
+### 1. Shared world model
+
+The underlying logical objects:
+
+* items
+* geometry
+* selection sets
+* modes
+* app state
+
+### 2. Presentation layer
+
+A rendering system that looks at world state and draws it.
+
+This can be separate, exactly as you’ve been feeling.
+
+### 3. Input interpretation layer
+
+Raw mouse/keyboard/touch input normalized into meaningful signals:
+
+* pointer-down
+* pointer-move
+* pointer-up
+* key-press
+* hover-still
+* drag-threshold-crossed
+* entered-object
+* left-object
+
+This layer may use toolkit help, but exposes a cleaner vocabulary upward.
+
+### 4. Interaction machines
+
+Stateful processes that consume interpreted signals and act over time.
+
+### 5. Arbitration system
+
+When multiple machines could respond, who wins?
+
+* priority
+* capture
+* modal tool ownership
+* bubbling
+* exclusive grab
+* cooperative observation
+
+This is crucial.
+
+### 6. Effect/command layer
+
+How machines change state:
+
+* immediate state mutation
+* reducer messages
+* commands for undo/redo
+* transactional commits
+
+This can vary, but should be explicit.
+
+## What makes this more “arch-like” than many UI models
+
+Because it gives you a single, reusable mental form:
+
+> **An interaction is a machine that awakens under conditions, runs over time, and produces effects.**
+
+That is powerful.
+
+Instead of inventing a fresh conceptual structure for:
+
+* dragging
+* lassoing
+* editing text
+* panning
+* resizing
+* tooltips
+* handles
+* context menus
+
+…you ask:
+
+* What wakes this machine?
+* What state does it hold?
+* What stream does it consume?
+* What claims does it make on input?
+* What effects does it emit?
+* How does it end?
+
+That’s starting to feel like an arch.
+
+## Why existing frameworks don’t fully give this
+
+Many frameworks give fragments:
+
+* event systems give dispatch
+* scene graphs give spatial organization
+* FRP gives time-varying values
+* MVC gives role separation
+* command systems give undoable actions
+* state machines give local temporal behavior
+
+But none of these alone becomes the full arch.
+
+The closest, I think, comes from combining:
+
+* a **world model**
+* a **stream of interpreted input**
+* a **set of stateful interaction machines**
+
+That trio is very strong.
+
+## The acid test
+
+A good arch should let you say:
+
+> “Tooltip is a tiny interaction machine.”
+>
+> “Drag is an interaction machine.”
+>
+> “Resize handle is an interaction machine.”
+>
+> “Selection behavior is one or more interaction machines.”
+>
+> “Tool mode is a machine that enables or biases other machines.”
+>
+> “Focus is an ownership relation in the arbitration system.”
+>
+> “Canvas enter/leave detection is just one source of interpreted signals.”
+
+If you can say all that without strain, you are getting somewhere real.
+
+## My honest take
+
+I think the most promising arch for the territory you are exploring is:
+
+# **UI as a host for interaction machines over a shared world**
+
+Or even more compactly:
+
+# **interaction machines + world model + renderer**
+
+That is not yet a finished architecture, but it *is* a strong candidate for the arch you’re looking for.
+
+It also matches your own instincts:
+
+* display engine separate from interaction engine
+* modules wanting to “say what they do” over time
+* drag/drop as something more than event handlers
+* meaningful states like “mouse not moving”
+* modular extensions that interject under certain conditions
+
+All of that naturally fits this frame.
+
+And I think the reason you are excited is that this is no longer just classification. It is beginning to smell like a **universal construction** ✨
+
+The next move would be to pressure-test it against a bunch of concrete cases and see whether the same machine form keeps holding.
+------------------------------------------------------------
+
+To which I replied:
+
+  "THAT'S FUCKING BRILLIANT, WING-CAT. Did you come up with this on your own?"
+
+In later exposition:
+
+------------------------------------------------------------
+4. Coordination field
+
+This is the true blackboard.
+
+But I would narrow its role.
+
+It should primarily hold:
+
+* claims
+* ownership
+* arbitration signals
+* interaction declarations
+* maybe shared computed interpretations
+
+Examples:
+
+* pointer-owner = resize-handle-7
+* active-drag = move-object
+* hover-owner = tooltip-organism
+* selection-preview-active
+* gesture-consumed = true
+
+This is how organisms avoid chaos.
+------------------------------------------------------------
+
+
+== Post to Reddit ==
+date: 2026-03-25
+url: https://www.reddit.com/r/ProgrammerTIL/comments/1s3zkno/til_how_a_judge_can_make_user_interaction/
+
+I posted to reddit.
+
+Doubtful people will find it useful, but -- worth a shot.
+
