@@ -1,0 +1,8 @@
+date: 2026-04-19
+conversation: https://chatgpt.com/c/69e51bf6-3814-83e8-a156-3fe0f171c65a
+
+Supply:
+* f:/lion/github/blackboard-judge-architecture-demo/docs/raw/11__book-specification.txt
+* https://www.reddit.com/r/ProgrammerTIL/comments/1s3zkno/til_how_a_judge_can_make_user_interaction/
+* suggest reading through the demo: f:/lion/github/blackboard-judge-architecture-demo/src/demo/
+* may also read through f:/lion/github/nodebrowser/src/nodebrowser/ -- to see a full application

@@ -1,0 +1,267 @@
+date: 2026-04-19
+targetpath: f:/lion/github/blackboard-judge-architecture-demo/docs/book/
+
+
+## Tokenizer–Organism Interaction Architecture Manual (Tkinter Canvas)
+
+### Purpose
+
+Generate a multi-file technical manual describing a structured architecture for implementing complex user interactions in Tkinter Canvas applications.
+
+The manual must be:
+
+* precise
+* implementation-oriented
+* structured for LLM consumption
+* consistent across all sections
+
+---
+
+## Core Architecture (authoritative)
+
+The system is composed of the following layers:
+
+### RAW
+
+* Contains input state for the current and previous frame
+* Includes:
+
+  * mouse position (x, y)
+  * mouse button states
+  * key states
+  * time (seconds since start)
+* RAW is explicitly stored as:
+
+  * `current`
+  * `previous`
+
+---
+
+### DERIVED (Tokenizers)
+
+* Produced by tokenizers
+* Represents interpreted perceptual facts
+* Tokenizers may read:
+
+  * RAW.current
+  * RAW.previous
+  * DERIVED.previous
+* Tokenizers must:
+
+  * NOT emit effects
+  * NOT hold long-lived behavioral state
+  * ONLY define perception (e.g., drag, hover, hit-testing)
+
+---
+
+### ORGANISMS
+
+* Stateful processes (finite state machines)
+* Operate over time
+* May read:
+
+  * RAW
+  * DERIVED
+* Must:
+
+  * request permissions from Judge
+  * emit **effects only**
+* Must NOT:
+
+  * directly modify world model
+  * define perceptual logic (belongs to tokenizers)
+
+---
+
+### EFFECTS (output of organisms)
+
+Two types:
+
+#### Persistent Effects
+
+* Modify world model
+* Example:
+
+  * SET_SELECTION(ids)
+  * MOVE_NODE(id, dx, dy)
+
+#### Volatile Effects
+
+* Exist only for the current frame
+* Used for projection overlays
+* Example:
+
+  * SHOW_MARQUEE(rect)
+  * HIGHLIGHT(ids)
+
+---
+
+### WORLD MODEL
+
+* Authoritative persistent state
+* Contains:
+
+  * objects (nodes, rectangles, edges)
+  * positions, sizes
+  * selection state
+* Must ONLY be modified via persistent effects
+
+---
+
+### JUDGE
+
+* Minimal arbitration system
+* Manages resource locks (e.g., POINTER)
+* Responsibilities:
+
+  * grant or deny permission
+  * track resource ownership
+* Must NOT:
+
+  * implement behavior logic
+  * interpret input
+
+---
+
+### PROJECTION
+
+Projection is a **reconciliation system** over a retained-mode canvas.
+
+Inputs:
+
+* world model (persistent)
+* volatile effects (current frame)
+
+Responsibilities:
+
+1. compute desired visual state
+2. compare with current canvas state
+3. apply:
+
+   * create
+   * update
+   * delete operations
+
+Projection must NOT modify world model.
+
+---
+
+## Output Structure
+
+Generate the following files:
+
+```plaintext
+00_overview.md
+01_core_principles.md
+02_data_contracts.md
+
+10_raw.md
+11_tokenizers.md
+12_organisms.md
+13_judge.md
+14_world_model.md
+15_projection.md
+
+20_example_marquee_selection.md
+21_example_node_linking.md
+22_example_drag_and_resize.md
+
+30_failure_modes.md
+31_design_notes.md
+32_appendix_patterns.md
+```
+
+---
+
+## File Requirements
+
+### General
+
+* Use precise, technical language
+* Avoid unnecessary explanation
+* Favor structure over prose
+* Use pseudocode where appropriate
+
+---
+
+### 12_organisms.md
+
+Must include:
+
+* a standard organism template in pseudocode
+* multiple examples
+* clear state machine structure
+
+---
+
+### 11_tokenizers.md
+
+Must include:
+
+* canonical tokenizers:
+
+  * pointer
+  * drag detection
+  * hit-testing
+  * region
+  * selection candidates
+
+---
+
+### 15_projection.md
+
+Must include:
+
+* reconciliation algorithm
+* retained-mode canvas explanation
+* mapping from world model → canvas objects
+
+---
+
+### Examples (20–22)
+
+Each example must:
+
+* follow full pipeline:
+  RAW → DERIVED → ORGANISMS → EFFECTS → WORLD MODEL → PROJECTION
+* include:
+
+  * tokenizers used
+  * organism pseudocode
+  * effects emitted
+  * projection behavior
+
+---
+
+## Critical Invariants (must be enforced)
+
+* Organisms emit only effects
+* Tokenizers define all perception
+* World model is mutated only via effects
+* Judge is minimal and does not contain behavior logic
+* Projection performs reconciliation, not immediate drawing
+
+---
+
+## Failure Modes Section
+
+Must explicitly describe:
+
+* tokenizers containing behavior
+* organisms redefining perception
+* judge becoming complex logic engine
+* projection mutating world model
+* duplication of perceptual logic
+
+---
+
+## Style Notes
+
+* Prefer clarity over completeness
+* Avoid speculation
+* Use consistent terminology across all files
+* Maintain strict separation of concerns
+
+---
+
+## End of Specification

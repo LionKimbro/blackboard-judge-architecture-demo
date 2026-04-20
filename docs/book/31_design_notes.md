@@ -1,0 +1,83 @@
+# 31 — Design Notes
+
+## Why a Blackboard?
+
+The term "blackboard" refers to the shared, readable state — RAW, DERIVED, the world model — that all layers write to or read from according to their role. Each layer has a defined relationship to the blackboard: some write a section, others read from it. No layer reads sections it is not permitted to read; no layer writes sections it does not own.
+
+This is different from a message-passing architecture, where layers communicate only by sending explicit messages. In the blackboard model, the current state is always visible to the appropriate consumers without additional routing. Tokenizers write DERIVED; organisms read it directly. This is intentional: it keeps the per-cycle communication simple and synchronous.
+
+---
+
+## Why a Judge?
+
+Without a Judge, organisms must negotiate among themselves. This produces organisms that are aware of each other — checking each other's state, deciding whether to yield, encoding priority rules. As the organism count grows, each new organism requires understanding all existing organisms.
+
+The Judge externalizes the negotiation. Organisms ask a neutral party for permission; they receive yes or no. An organism does not need to know about other organisms to be denied a resource that another holds. Adding a new organism does not require modifying existing organisms, as long as the new one participates in the same permission protocol.
+
+The Judge must remain minimal to preserve this property. If application logic enters the Judge, the Judge becomes the thing that must be understood when adding organisms.
+
+---
+
+## Why Two Permission Types?
+
+`START` and `HOLD-RESOURCE` serve different purposes.
+
+`START` is a soft claim. It checks that the interaction is not already contested but does not lock the resource. This allows an organism to begin its ARMED phase — where it is watching for confirmation that the gesture is real — without preventing other organisms from also starting. Multiple organisms may be ARMED simultaneously on different resources.
+
+`HOLD-RESOURCE` is a hard lock. It is called when the gesture has been confirmed (threshold crossed, intent established). At this point, the resource is locked exclusively. Only one organism may hold a given resource.
+
+This two-phase design avoids premature locking. A single-click followed by a release should not leave a resource locked for the entire click duration if the organism never progressed past ARMED. The lock is acquired only when the intent is established.
+
+---
+
+## Why ARMED Before DRAGGING?
+
+The ARMED state exists to absorb ambiguity. A press on an object might become a click (release quickly) or a drag (move enough). The organism cannot know which at press time.
+
+ARMED lets the organism observe subsequent events without committing resources. On quick release, the organism clears cleanly, possibly emitting a click effect. On threshold crossing, the organism escalates and acquires the lock.
+
+Without ARMED, the organism must either lock immediately at press (preventing other organisms from responding to a quick click on the same object) or use ad-hoc flags to defer locking (duplicating the ARMED concept without naming it).
+
+---
+
+## Why Volatile Effects?
+
+Volatile effects allow organisms to communicate transient visual state — marquee rectangles, hover highlights, drag previews, edge previews — without storing that state in the world model.
+
+The world model should contain only durable state: what exists, where it is, what is selected. A marquee rectangle is not a durable world entity; it is a rendering artifact of an in-progress gesture. If it were stored in the world model, the projection system would need to know to remove it when the gesture ends. The organism would need to explicitly clean up. Serialization would capture it.
+
+Volatile effects solve all of this: they are emitted each cycle while active and simply absent when the gesture ends. The projection system finds them in the effect queue; if they are not there, they are not drawn.
+
+---
+
+## Why Reconciliation?
+
+Reconciliation (diff-based projection) is the correct model for a retained-mode canvas. Tkinter Canvas items have identity: they persist between frames and can be moved or restyled without recreation.
+
+Full clear-and-redraw works but wastes canvas operations and can cause flicker or selection loss if canvas items carry state (tags, bindings). More importantly, it misrepresents the semantics: a moving object is still the same object, not a new one.
+
+Reconciliation makes the projection system a pure function of its inputs at the semantic level: given the same world model and volatile effects, it produces the same visual output. The implementation tracks canvas item identity to achieve this efficiently.
+
+---
+
+## Why Not Event-Driven Organisms?
+
+An alternative design lets organisms subscribe to events (press, release, motion) and activate only on relevant events. This is how most traditional UI frameworks work.
+
+The cycle-based model has two advantages:
+
+1. **Time-based behavior.** Organisms that react to motionlessness, to elapsed time, or to periodic ticks need a regular heartbeat. Events only fire when the user does something.
+
+2. **Uniform reasoning.** Every organism runs every cycle. This means every organism always has access to the current complete state. There is no special-casing for "what if the organism missed an event?" All decisions are made from current state, not from received messages.
+
+The cost is that organisms must be written to be inexpensive when idle. An organism in IDLE that does nothing should return immediately. This is a convention, not an enforcement; the architecture assumes well-behaved organisms.
+
+---
+
+## Organism Registration Order as Priority
+
+Organism priority is determined by registration order. The first organism to successfully call `get_permission("START", ...)` for a given resource wins; later organisms are denied.
+
+This is a deliberate simplification. An explicit priority system would require organisms to declare priorities, and the Judge to compare them. With registration order, the priority is expressed structurally: the list of organisms is the policy.
+
+The consequence is that registration order is load-bearing. It should be documented and treated as part of the system's specification, not as an implementation detail.
