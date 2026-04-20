@@ -29,7 +29,11 @@ RAW is read-only to all layers except the cycle runner that populates it.
 
 ## DERIVED
 
-Produced by tokenizers. Reset to defaults at the start of each tokenizer pass. Each tokenizer writes only its own fields.
+Produced by tokenizers. `DERIVED.current` is set to an empty dict at the start of each tokenizer pass — not a dict of defaults, but genuinely empty. Each tokenizer is solely responsible for writing its own fields. If a tokenizer fails to write a field and a consumer reads it, the missing key produces a loud error rather than a silent wrong value.
+
+`DERIVED.previous` is the frozen snapshot of the prior cycle's `DERIVED.current` and is always fully populated (it was written by last cycle's tokenizers).
+
+Each tokenizer writes only its own fields.
 
 ```
 DERIVED.current:
@@ -64,7 +68,7 @@ DERIVED is read-only to organisms. Tokenizers write DERIVED; organisms only read
 
 ## EFFECTS
 
-The effect queue is populated by organisms during their run and consumed by `route_effects()`. It is cleared at the start of each organism evaluation pass.
+The effect queue exists only between organism execution and routing. It is cleared at the start of each organism evaluation pass, populated as organisms run, and fully consumed by `route_effects()` before the next cycle begins. Effects do not persist across cycles.
 
 Each effect is a record:
 
@@ -104,19 +108,27 @@ Volatile effects exist for one frame only. They are consumed by the projection s
 
 Maintained by the Judge. Readable by organisms only through `get_permission()`.
 
+The structure of coordination state depends on which judge implementation the application uses. Two common configurations are shown below; others are possible. See `13_judge.md` for full implementations.
+
+**Pointer-only judge** — minimal, sufficient for most pointer-driven applications:
+
 ```
 coordination:
-    pointer_owner   : organism_name | None  -- who currently owns the pointer
-    resource_holds  : { resource_id → organism_name }  -- held resources
-    leases          : { organism_name → lease }
-
-lease:
-    resources   : set of resource_id
-    kind        : "exclusive"
-    valid       : bool
+    pointer_owner : organism_name | None
 ```
 
-Organisms do not read `coordination` directly. They call `get_permission()` and receive a boolean.
+**Resource-based judge** — for applications where organisms may contest named resources, including or independent of the pointer:
+
+```
+coordination:
+    resource_holds  : { resource_id → organism_name }
+    leases          : { organism_name → set of resource_id }
+
+-- "pointer" is just a resource_id in this model.
+-- resource_holds.get("pointer") gives pointer ownership.
+```
+
+In either case, organisms do not read `coordination` directly. They call `get_permission()` and receive a boolean.
 
 ---
 
