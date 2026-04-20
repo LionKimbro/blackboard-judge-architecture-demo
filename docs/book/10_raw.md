@@ -82,6 +82,31 @@ on tick:
 
 ---
 
+## The Priming Cycle
+
+On the first cycle after initialization, `RAW.current` is populated normally, but `RAW.previous` and `DERIVED.previous` do not yet contain meaningful observations — they contain only initialization values.
+
+This is not a special case or a workaround. It is a natural consequence of the architecture's reliance on temporal deltas: all meaningful perception (motion, button transitions, drag thresholds, enter/leave events) requires comparing the current frame against a prior frame. No prior frame exists on the first cycle.
+
+**Design requirement:** initialize `RAW.previous` to the same neutral values as `RAW.current` before the first cycle runs. With current == previous, all delta-based tokenizers naturally produce zero or false:
+
+```
+function initialize():
+    RAW.current  ← neutral_raw()    -- all zeros, buttons up, inside_canvas False
+    RAW.previous ← neutral_raw()    -- identical; delta will be zero
+    DERIVED.current  ← {}
+    DERIVED.previous ← {}
+    run_cycle({})                    -- the priming cycle
+```
+
+The priming cycle runs the full pipeline once. Tokenizers produce neutral outputs (no motion, no transitions, no threshold crossings). Organisms see no actionable events and produce no effects. The world model is unchanged. Projection renders the initial world state.
+
+After the priming cycle completes, `RAW.previous` and `DERIVED.previous` hold real baseline values. All subsequent cycles produce meaningful deltas.
+
+**The priming cycle is inert by design.** It establishes baseline state and performs the first projection render. It must produce no observable side effects.
+
+---
+
 ## Constraints
 
 - RAW is written only by the cycle runner, never by tokenizers, organisms, the judge, or projection.

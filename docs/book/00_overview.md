@@ -31,7 +31,7 @@ RAW → DERIVED → ORGANISMS → EFFECTS → WORLD MODEL → PROJECTION
 | Layer | Reads | Writes | Holds State |
 |---|---|---|---|
 | RAW | Tk events | RAW.current, RAW.previous | No (snapshot) |
-| DERIVED | RAW.current, RAW.previous, DERIVED.previous | DERIVED.current | Minimal (tokenizer-local) |
+| DERIVED | RAW.current, RAW.previous, DERIVED.previous, world model | DERIVED.current | Minimal (tokenizer-local) |
 | ORGANISMS | RAW, DERIVED | Effects | Yes (FSM state) |
 | JUDGE | Organism requests | Coordination record | Yes (resource table) |
 | WORLD MODEL | — | — | Yes (durable) |
@@ -52,6 +52,8 @@ function run_cycle(raw_input):
 ```
 
 The cycle is triggered by Tk event callbacks. A periodic timer may also trigger cycles so time-based organisms can progress without pointer activity.
+
+On startup, a single **priming cycle** runs before any events arrive. It establishes `RAW.previous` and `DERIVED.previous` as meaningful baselines and performs the first projection render. All perception that depends on temporal deltas (motion, button transitions, drag thresholds) begins on the second cycle. See `10_raw.md`.
 
 ---
 

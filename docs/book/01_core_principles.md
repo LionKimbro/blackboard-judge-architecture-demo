@@ -8,11 +8,13 @@ These invariants are non-negotiable. Violations produce systems that are difficu
 
 ### 1. Tokenizers define all perception
 
-Tokenizers are the only place where raw input is interpreted into perceptual meaning. No other layer may perform hit-testing, edge detection, spatial reasoning, or temporal pattern recognition.
+Tokenizers compute perceptual facts from RAW and the world model. They are the only place where this translation occurs. No other layer may perform hit-testing, edge detection, spatial reasoning, or temporal pattern recognition.
 
 **Correct:** An organism reads `DERIVED["drag-threshold-crossed"]` to know whether a drag has started.  
+**Correct:** An organism reads `DERIVED["pointer-target"]` to know what object is under the cursor.  
 **Correct:** An organism reads `RAW["x"]` and `RAW["y"]` to compute a new object position during a drag.  
-**Violation:** An organism computes distance from the press point itself to decide whether a drag has started.
+**Violation:** An organism computes distance from the press point itself to decide whether a drag has started.  
+**Violation:** An organism queries the world model geometry directly to find what is under the cursor.
 
 ---
 

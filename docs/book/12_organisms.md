@@ -119,10 +119,8 @@ function handle_drag_idle(organism):
     target ← DERIVED.current.pointer_target
     if target is None:
         return
-    if target in world.selection:
-        return   -- group drag takes precedence
 
-    if not get_permission("START", [target]):
+    if not get_permission("START", [target, "pointer"]):
         clear(organism)
         return
 
@@ -146,7 +144,7 @@ function handle_drag_armed(organism):
     if not DERIVED.current.drag_threshold_crossed:
         return
 
-    if not get_permission("HOLD-RESOURCE", [organism.held.object_id]):
+    if not get_permission("HOLD-RESOURCE", [organism.held.object_id, "pointer"]):
         clear(organism)
         return
 
@@ -314,6 +312,28 @@ function handle_group_dragging(organism):
 Organisms run in registration order each cycle. Order determines implicit priority: if two organisms would both attempt to claim the same resource at START, the one earlier in the list gets the grant; the later one is denied.
 
 Design the registration order to reflect intended priority. Document the reasoning when order is load-bearing.
+
+---
+
+## Organisms Must Not Encode Coordination Logic
+
+Organisms must not encode coordination logic about other organisms.
+
+In particular, organisms must not:
+
+- Check for conditions that imply another organism should take precedence (e.g., `if target in world.selection: return`).
+- Replicate coordination decisions using world state, pointer location, or any other proxy for "what another organism would do."
+- Attempt to avoid conflicts by conditionally disabling themselves based on assumed behavior of siblings.
+
+All coordination between organisms must occur exclusively through:
+
+- `get_permission()` — the organism asks; the judge answers.
+- Resource contention — if a resource is held, the request is denied.
+- Organism ordering — registration order determines who gets first access.
+
+If an organism's behavior depends on whether another organism should act, that dependency must be expressed through resource requests, not conditional logic. The organism does not need to know why it was denied — only that it was.
+
+Violations of this rule introduce hidden coupling between organisms and break the modularity that the Judge exists to provide.
 
 ---
 

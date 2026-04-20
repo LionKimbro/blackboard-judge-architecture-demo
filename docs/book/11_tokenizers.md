@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Tokenizers translate raw input into interpreted perceptual facts. They are the only layer that performs this translation. All perceptual logic lives here and nowhere else.
+Tokenizers compute perceptual facts from RAW and the world model. They are the only layer that performs this translation. All perceptual logic lives here and nowhere else.
 
 ---
 
@@ -24,7 +24,7 @@ function run_tokenizers():
 
 ### Rules
 
-- A tokenizer reads `RAW.current`, `RAW.previous`, and `DERIVED.previous`.
+- A tokenizer reads `RAW.current`, `RAW.previous`, `DERIVED.previous`, and the world model.
 - A tokenizer writes fields in `DERIVED.current`.
 - A tokenizer does **not** emit effects.
 - A tokenizer does **not** hold behavioral state (no FSM, no action memory).
@@ -175,6 +175,127 @@ Tokenizers run in registration order. Dependencies must be respected:
 - `button_1` must run before `drag_threshold` (threshold reads `button_1_pressed`).
 - `hit_test` must run before any tokenizer that reads `pointer_target`.
 - `drag_threshold` may run before or after `hit_test`; they are independent.
+
+---
+
+## 7. Click and Temporal Pattern Detection
+
+Tokenizers may recognize temporal patterns in input, including click, double-click, long press, and more complex sequences. These are perceptual classifications, not behavioral decisions.
+
+### Principles
+
+- Temporal patterns are computed from `RAW.current`, `RAW.previous`, `DERIVED.previous`, and tokenizer-local timing state.
+- Tokenizers must not delay or suppress events to resolve ambiguity.
+- Multiple overlapping patterns may be true within the same frame.
+- Interpretation of overlapping patterns (e.g., suppressing single-click in favor of double-click) is the responsibility of organisms.
+
+---
+
+### Canonical Click Tokenizer
+
+Detects a short press-release interaction.
+
+```
+CLICK_MAX_DURATION_MS ← 150
+
+function tokenizer_click(data):
+    DERIVED.current.single_click ← False
+
+    if DERIVED.current.button_1_pressed:
+        data.press_time   ← RAW.current.time_ms
+        data.press_target ← DERIVED.current.pointer_target
+        data.press_pos    ← { x: RAW.current.x, y: RAW.current.y }
+
+    if DERIVED.current.button_1_released and data.press_time is not None:
+        duration ← RAW.current.time_ms - data.press_time
+        if duration <= CLICK_MAX_DURATION_MS:
+            DERIVED.current.single_click    ← True
+            DERIVED.current.click_target    ← data.press_target
+            DERIVED.current.click_position  ← data.press_pos
+        data.press_time   ← None
+        data.press_target ← None
+```
+
+---
+
+### Canonical Double-Click Tokenizer
+
+Detects two clicks close in time and space. Depends on `single_click` from the click tokenizer; must run after it.
+
+```
+DOUBLE_CLICK_MS      ← 300
+CLICK_TOLERANCE_PX   ← 6
+
+function tokenizer_double_click(data):
+    DERIVED.current.double_click ← False
+
+    if not DERIVED.current.single_click:
+        return
+
+    now            ← RAW.current.time_ms
+    last_time      ← data.get("last_click_time")
+    last_pos       ← data.get("last_click_pos")
+    last_target    ← data.get("last_click_target")
+    current_pos    ← DERIVED.current.click_position
+    current_target ← DERIVED.current.click_target
+
+    if last_time is not None:
+        dt ← now - last_time
+        dx ← current_pos.x - last_pos.x
+        dy ← current_pos.y - last_pos.y
+        close_enough ← (dx*dx + dy*dy) <= (CLICK_TOLERANCE_PX * CLICK_TOLERANCE_PX)
+        if dt <= DOUBLE_CLICK_MS and close_enough and current_target == last_target:
+            DERIVED.current.double_click ← True
+            data.last_click_time ← None
+            return
+
+    data.last_click_time   ← now
+    data.last_click_pos    ← current_pos
+    data.last_click_target ← current_target
+```
+
+---
+
+### Long Press
+
+Detects a press held beyond a time threshold.
+
+```
+LONG_PRESS_MS ← 500
+
+function tokenizer_long_press(data):
+    DERIVED.current.long_press ← False
+
+    if DERIVED.current.button_1_pressed:
+        data.press_time ← RAW.current.time_ms
+
+    if RAW.current.button_1_down and data.press_time is not None:
+        if RAW.current.time_ms - data.press_time >= LONG_PRESS_MS:
+            DERIVED.current.long_press ← True
+
+    if DERIVED.current.button_1_released:
+        data.press_time ← None
+```
+
+---
+
+### Notes on Overlapping Patterns
+
+Temporal patterns are not mutually exclusive. A `single_click` may be followed by a `double_click`. A `long_press` may overlap with drag initiation. Tokenizers report what is true; organisms decide what to act on.
+
+---
+
+## Extension: Complex Input Languages
+
+The tokenizer layer may be extended to recognize richer temporal or combinatorial input patterns, including:
+
+- Key chords (multi-key combinations held simultaneously)
+- Tap sequences (e.g., timed multi-tap patterns)
+- Gesture sequences (e.g., hold → tap → release)
+- Keyset input (e.g., Engelbart-style multi-finger chords on A, S, D, F, Space)
+- Multi-button or multi-pointer interactions
+
+These belong in the tokenizer layer as long as they classify input patterns, do not encode application behavior, and produce inspectable facts in `DERIVED`. The complexity of the pattern recognition is not a disqualifier — the criterion is purely whether the output is a perceptual fact or a behavioral decision.
 
 ---
 
