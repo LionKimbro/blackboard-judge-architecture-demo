@@ -14,7 +14,11 @@ Without a Judge, organisms must negotiate among themselves. This produces organi
 
 The Judge externalizes the negotiation. Organisms ask a neutral party for permission; they receive yes or no. An organism does not need to know about other organisms to be denied a resource that another holds. Adding a new organism does not require modifying existing organisms, as long as the new one participates in the same permission protocol.
 
-The Judge must remain minimal to preserve this property. If application logic enters the Judge, the Judge becomes the thing that must be understood when adding organisms.
+Application logic is expected to enter the Judge. UI interactions are inherently entangled — gestures compete, priorities depend on context, and new organisms do not naturally coexist with existing ones without coordination. That coordination has to live somewhere. The Judge is where it lives, by design.
+
+When a new organism is added, the Judge will likely need to be updated: resources must be allocated, priorities must be expressed, and room must be made. This is an expected cost, not a failure. The goal is not to keep the Judge empty — it is to keep that complexity *out of the organisms* and centralized in one place. An organism that can be understood in isolation, exercised independently, and transplanted to another application is worth the cost of a Judge that must be consulted when the application grows.
+
+Think of the Judge as the remainder of a division: when you modularize organisms as completely as possible, what is left over — the residual coordination logic that cannot be made local to any one organism — collects in the Judge. It cannot be eliminated; it can only be centralized.
 
 ---
 
@@ -25,6 +29,8 @@ The Judge must remain minimal to preserve this property. If application logic en
 `CHECK` is a soft feasibility test. It verifies that the resources the organism needs are not already locked by another, but does not lock them. This allows an organism to begin its ARMED phase — where it is watching for confirmation that the gesture is real — without preventing other organisms from also arming. Multiple organisms may be ARMED simultaneously, all having passed their CHECK.
 
 `COMMIT` is a hard lock. It is called when the gesture has been confirmed (threshold crossed, intent established). At this point, the resource is locked exclusively. Only one organism may hold a given resource. This is where conflicts are resolved: the first organism to call `COMMIT` for a contested resource wins; later organisms are denied and clear.
+
+  Note: For an alternative that resolves conflicts through an explicit bid-based priority policy rather than registration order, see `33_appendix_judge-bid-model.md`.
 
 This two-phase design avoids premature locking. A single-click followed by a release should not leave a resource locked for the entire click duration if the organism never progressed past ARMED. The lock is acquired only when the intent is established.
 
@@ -62,15 +68,15 @@ Reconciliation makes the projection system a pure function of its inputs at the 
 
 ## Why Not Event-Driven Organisms?
 
-An alternative design lets organisms subscribe to events (press, release, motion) and activate only on relevant events. This is how most traditional UI frameworks work.
+An alternative design lets organisms subscribe to events — either raw input events (press, release, motion) or interpreted DERIVED events ("drag threshold crossed," "button pressed") — and activate only when a relevant event fires.
 
-The cycle-based model has two advantages:
+The theoretical appeal is efficiency: each condition is tested once, and only organisms that subscribed to that condition are notified. But tokenizers already achieve this. Every perceptual test runs exactly once per cycle, and every organism reads the result directly from DERIVED. There is no redundant testing to eliminate. Routing results through a subscription system rather than a shared blackboard would reduce per-cycle overhead by a negligible amount while adding a layer of indirection — topics, subscriptions, delivery order — that the cycle model simply does not need.
 
-1. **Time-based behavior.** Organisms that react to motionlessness, to elapsed time, or to periodic ticks need a regular heartbeat. Events only fire when the user does something.
+A further problem: the events an organism cares about depend on its current state. An organism in IDLE wants "button pressed"; in ARMED it wants "threshold crossed" and "button released"; in ACTIVE it wants "button released." A subscription system would therefore need to either (a) subscribe the organism to all events it might ever need in any state, and check state inside each handler anyway, or (b) track organism state and rewire subscriptions on every transition. Option (a) recovers most of the per-cycle cost; option (b) requires substantial infrastructure just to route events correctly. In neither case is the state logic eliminated — it is only moved around.
 
-2. **Uniform reasoning.** Every organism runs every cycle. This means every organism always has access to the current complete state. There is no special-casing for "what if the organism missed an event?" All decisions are made from current state, not from received messages.
+The cycle model is chosen because it is straightforward to think about. Every organism runs every cycle. State is read directly. There is no question of delivery order, missed events, or subscription management. The simplicity is worth more than the hypothetical optimization.
 
-The cost is that organisms must be written to be inexpensive when idle. An organism in IDLE that does nothing should return immediately. This is a convention, not an enforcement; the architecture assumes well-behaved organisms.
+The one real cost is that organisms must be inexpensive when idle. An organism in IDLE that has nothing to do should return immediately. This is a convention, not an enforcement; the architecture assumes well-behaved organisms.
 
 ---
 
@@ -83,3 +89,6 @@ Organism priority is determined by registration order. When multiple organisms h
 This is a deliberate simplification. An explicit priority system would require organisms to declare priorities, and the Judge to compare them. With registration order, the priority is expressed structurally: the list of organisms is the policy.
 
 The consequence is that registration order is load-bearing. It should be documented and treated as part of the system's specification, not as an implementation detail.
+
+  Note: For an alternative that resolves conflicts through an explicit bid-based priority policy rather than registration order, see `33_appendix_judge-bid-model.md`.
+

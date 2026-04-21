@@ -13,8 +13,5 @@ This note exists so that older documents, code, or conversations using earlier t
 
 These were renamed because `START` suggested that calling it initiated something (it does not — no lock is acquired), and `HOLD-RESOURCE` was verbose while `HOLD` alone was ambiguous. `CHECK` / `COMMIT` form a cleaner conceptual pair: feasibility vs. commitment.
 
----
 
-## Architecture Name
 
-The architecture was originally called the **Tokenizer–Organism Interaction Architecture**. It was renamed to the **Blackboard-Judge Interaction Architecture** to reflect that the Judge — not the Tokenizer/Organism split — is the central insight. The Tokenizer/Organism separation is a valuable optimization that keeps organism code clean, but organism modularity is made possible by the Judge. The Tokenizer/Organism split eliminates redundant perception code; the Judge eliminates inter-organism coupling.

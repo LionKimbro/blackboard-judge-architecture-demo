@@ -55,9 +55,6 @@ function organism_HIGHLIGHT(organism):
     if not condition:
         return
 
-    if not get_permission("CHECK", []):
-        return
-
     emit_effect("volatile", [effect], [payload])
 ```
 

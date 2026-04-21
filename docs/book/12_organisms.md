@@ -85,13 +85,10 @@ function organism_hover_highlight(organism):
     if target is None:
         return
 
-    if not get_permission("CHECK", []):
-        return
-
     emit_effect("volatile", "hover-highlight", { object_id: target })
 ```
 
-Note: hover-highlight does not need to hold a resource lock between cycles. It simply checks each cycle whether it may emit.
+Note: hover-highlight holds no resources. It emits a volatile effect each cycle when the condition holds, with no Judge interaction required.
 
 ---
 
