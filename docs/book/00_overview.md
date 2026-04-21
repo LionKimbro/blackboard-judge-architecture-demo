@@ -85,3 +85,4 @@ On startup, a single **priming cycle** runs before any events arrive. It establi
 | `32_appendix_patterns.md` | Reusable pseudocode patterns |
 | `33_appendix_judge-bid-model.md` | Optional bid-based judge variant |
 | `34_appendix_historical-note.md` | Former terminology (START, HOLD-RESOURCE, architecture name) |
+| `35_appendix_2d-infinite-canvas.md` | Viewport, coordinate conversion, pan organism, zoom |
