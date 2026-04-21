@@ -193,9 +193,11 @@ The preview line is redrawn each cycle as the pointer moves. `reconcile()` calls
 
 ## Interaction With Other Organisms
 
-When the pointer is over a node with Shift held, `node-drag` and `group-drag` organisms see their START requests denied because `edge-create` already holds the pointer. This is implicit priority by organism order: `edge-create` must be registered before `node-drag` and `group-drag`.
+On a Shift+press-on-node, `edge-create`, `node-drag`, and `group-drag` may all pass their START checks and move to ARMED simultaneously. START is a soft check — it locks nothing. All three organisms wait, armed, watching for the drag threshold.
 
-If `edge-create` is registered after them, it would need to check Shift state and deny itself, or the other organisms would need to check Shift and yield. The cleanest design: `edge-create` appears first and claims the pointer on Shift+press-on-node; later organisms see the pointer as owned and do not attempt to start.
+When the threshold is crossed, all three attempt HOLD in registration order. The first to succeed locks the pointer; the others are denied and clear. No organism knows the others exist or why it was denied.
+
+**Registration order is therefore load-bearing.** `edge-create` must be registered before `node-drag` and `group-drag`. That ordering is the sole mechanism by which edge creation takes priority over dragging when Shift is held. It must be treated as part of the system's specification, not an implementation detail.
 
 ---
 

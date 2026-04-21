@@ -45,6 +45,15 @@ DERIVED.current.drag_threshold_crossed ← False
 DERIVED.current.drag_threshold_crossed ← True   (and stays True until release)
 ```
 
+**region-candidates tokenizer:**
+```
+-- Each cycle while a drag rect exists:
+DERIVED.current.region_candidates ← [ids of objects intersecting the current drag rect]
+
+-- When no drag rect:
+DERIVED.current.region_candidates ← []
+```
+
 ---
 
 ### ORGANISMS
@@ -88,10 +97,9 @@ organism.state ← "SELECTING"
 ```
 state: SELECTING
 
-rect ← normalize({ press_point, RAW.current })
-hits ← objects_in_rect(rect)
+hits ← DERIVED.current.region_candidates
 
-emit_effect("volatile", "show-marquee", { rect: rect, candidate_ids: hits })
+emit_effect("volatile", "show-marquee", { rect: DERIVED.current.drag_rect, candidate_ids: hits })
 
 -- world model unchanged this cycle
 ```
@@ -102,10 +110,9 @@ emit_effect("volatile", "show-marquee", { rect: rect, candidate_ids: hits })
 state: SELECTING
 condition: button_1_released is True
 
-rect ← normalize({ press_point, RAW.current })
-hits ← objects_in_rect(rect)
+hits ← DERIVED.current.region_candidates
 
-emit_effect("volatile", "show-marquee", { rect: rect, candidate_ids: hits })
+emit_effect("volatile", "show-marquee", { rect: DERIVED.current.drag_rect, candidate_ids: hits })
 emit_effect("persistent", "set-selection", { object_ids: hits })
 
 clear(organism)
@@ -179,8 +186,7 @@ If candidates are highlighted visually, the desired state adds:
 
 ## Key Invariants Demonstrated
 
-- Hit-testing (`objects_in_rect`) is performed by the organism reading from the world model, not by a tokenizer.  
-  *(Rationale: this is a spatial query driven by organism-local context — the press point and current pointer — not a general perceptual fact shared by all consumers.)*
+- Region intersection (`region_candidates`) is computed by the region-candidates tokenizer, not by the organism. The organism reads `DERIVED.current.region_candidates` — it performs no spatial reasoning itself.
 - The world model is not modified until release.
 - The marquee rectangle is a volatile effect; it vanishes automatically next cycle unless re-emitted.
 - The organism does not touch the canvas directly.

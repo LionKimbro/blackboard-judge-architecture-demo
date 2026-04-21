@@ -19,7 +19,7 @@ What is always true:
 
 An organism that wants to act asks the judge. If granted, it proceeds. If denied, it yields. It does not need to inspect other organisms' state, check what else might be happening, or encode priority logic relative to its siblings. The judge absorbs all of that.
 
-The shape of a judge — what it tracks, what it checks, how it communicates with organisms — should be designed around the specific contestation needs of the application. The two implementations below cover common cases, but they are starting points, not requirements.
+The shape of a judge — what it tracks, what it checks, how it communicates with organisms — should be designed around the specific contestation needs of the application. The two implementations below cover common cases, but they are possible starting points, not requirements.
 
 ---
 
@@ -158,3 +158,5 @@ The resource extension is useful when:
 The judge should be as small as possible. Any logic that encodes application behavior belongs in the organisms, not the judge. When in doubt: if it requires knowledge of what the user is trying to do, it is not judge logic.
 
 Priority between organisms is expressed by registration order, not by judge rules. See `12_organisms.md`.
+
+When registration order is insufficient — for example, when priority between competing gestures should be data-driven rather than structural — an alternative bid-based coordination model is available. See `33_appendix_judge-bid-model.md`.

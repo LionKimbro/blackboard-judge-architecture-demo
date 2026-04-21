@@ -49,21 +49,21 @@ function tokenizer_resize_handles(data):
 
 ```
 state: IDLE
+target ← DERIVED.current.pointer_target    -- "alpha" in this example
 condition:
-    button_1_pressed AND pointer_target == "alpha"
+    button_1_pressed AND target is not None
     AND pointer_handle_target is None
-    AND "alpha" not in world.selection
 
-get_permission("START", ["alpha"])
-  -- "alpha" not held → granted
+get_permission("START", [target, "pointer"])
+  -- target not held → granted
 
-emit_effect("persistent", "set-selection", { object_ids: ["alpha"] })
+emit_effect("persistent", "set-selection", { object_ids: [target] })
 
-organism.held ← { object_id: "alpha" }
+organism.held ← { object_id: target }
 organism.data ← {
     press_point: { x: RAW.x, y: RAW.y },
-    grab_offset: { x: RAW.x - world.objects["alpha"].x,
-                   y: RAW.y - world.objects["alpha"].y }
+    grab_offset: { x: RAW.x - world.objects[target].x,
+                   y: RAW.y - world.objects[target].y }
 }
 organism.state ← "ARMED"
 ```
@@ -89,9 +89,8 @@ clear(organism)
 state: ARMED
 condition: drag_threshold_crossed is True
 
-get_permission("HOLD-RESOURCE", ["alpha"])
-  -- "alpha" not held by another organism → granted
-  -- pointer_owner ← "drag-object", resource_holds["alpha"] ← "drag-object"
+get_permission("HOLD-RESOURCE", [organism.held.object_id, "pointer"])
+  -- target not held by another organism → granted
 
 organism.state ← "DRAGGING"
 ```
@@ -101,22 +100,32 @@ organism.state ← "DRAGGING"
 ```
 state: DRAGGING
 
-grab ← organism.data.grab_offset
+target ← organism.held.object_id
+grab   ← organism.data.grab_offset
 x ← RAW.current.x - grab.x
 y ← RAW.current.y - grab.y
 
-emit_effect("persistent", "move-object", { object_id: "alpha", x: x, y: y })
-emit_effect("volatile",   "drag-preview", { object_id: "alpha",
-                                             pointer_x: RAW.current.x,
-                                             pointer_y: RAW.current.y })
+emit_effect("volatile", "drag-preview", { object_id: target,
+                                          x: x, y: y,
+                                          pointer_x: RAW.current.x,
+                                          pointer_y: RAW.current.y })
 ```
+
+The object remains at its original position during the drag. The volatile effect signals the projection system to render a ghost at the computed destination each cycle.
 
 ### Final cycle — Release
 
 ```
 condition: button_1_released is True
+
+target ← organism.held.object_id
+grab   ← organism.data.grab_offset
+x ← RAW.current.x - grab.x
+y ← RAW.current.y - grab.y
+
+emit_effect("persistent", "move-object", { object_id: target, x: x, y: y })
 clear(organism)
--- lease released; pointer_owner ← None; resource_holds["alpha"] removed
+-- lease released; pointer and target resource freed
 ```
 
 ---
@@ -129,15 +138,20 @@ Resize runs concurrently with drag (both organisms are always evaluated each cyc
 
 ```
 state: IDLE
+handle_target ← DERIVED.current.pointer_handle_target  -- e.g. { object_id: "alpha", handle: "se" }
 condition:
     button_1_pressed
-    AND pointer_handle_target == { object_id: "alpha", handle: "se" }
+    AND handle_target is not None
 
-get_permission("START", ["alpha"])
-  -- If drag-object already holds "alpha": denied → clear, return.
+target ← handle_target.object_id
+handle ← handle_target.handle
+obj    ← world.objects[target]
+
+get_permission("START", [target, "pointer"])
+  -- If drag-object already holds target: denied → clear, return.
   -- Otherwise: granted.
 
-organism.held ← { object_id: "alpha", handle: "se" }
+organism.held ← { object_id: target, handle: handle }
 organism.data ← {
     press_point: { x: RAW.x, y: RAW.y },
     start_rect:  { x: obj.x, y: obj.y, w: obj.w, h: obj.h }
@@ -148,8 +162,8 @@ organism.state ← "ARMED"
 ### Threshold and HOLD-RESOURCE (same as drag):
 
 ```
-get_permission("HOLD-RESOURCE", ["alpha"])
-  -- If drag-object holds "alpha": denied → clear.
+get_permission("HOLD-RESOURCE", [organism.held.object_id, "pointer"])
+  -- If drag-object holds the target: denied → clear.
   -- Otherwise: granted.
 
 organism.state ← "DRAGGING"
@@ -159,8 +173,8 @@ organism.state ← "DRAGGING"
 
 ```
 emit_effect("persistent", "resize-object", {
-    object_id:  "alpha",
-    handle:     "se",
+    object_id:  organism.held.object_id,
+    handle:     organism.held.handle,
     start_rect: organism.data.start_rect,
     pointer_x:  RAW.current.x,
     pointer_y:  RAW.current.y
@@ -196,16 +210,16 @@ function apply_resize(payload):
 
 ## Judge Interaction — Conflict Scenario
 
-Suppose drag-object has just claimed `HOLD-RESOURCE` on `"alpha"` (it is in DRAGGING state). In the same cycle, resize-object attempts `START` on `"alpha"`:
+Suppose drag-object has just claimed `HOLD-RESOURCE` on `target` (it is in DRAGGING state). In the same cycle, resize-object attempts `START` on the same object:
 
 ```
-get_permission("START", ["alpha"])
-  -- resource_holds["alpha"] == "drag-object" ≠ "resize-object"
+get_permission("START", [target, "pointer"])
+  -- resource_holds[target] == "drag-object" ≠ "resize-object"
   -- denied
   → clear(resize-object organism)
 ```
 
-Resize cannot start while drag holds the object. The converse is also true: if resize holds `"alpha"`, drag is denied START.
+Resize cannot start while drag holds the object. The converse is also true: if resize holds `target`, drag is denied START.
 
 ---
 
@@ -214,9 +228,10 @@ Resize cannot start while drag holds the object. The converse is also true: if r
 ### During drag:
 
 ```
-"object:alpha:body"      → moves each cycle (coords update via canvas.coords())
-"object:alpha:label"     → moves with body
-"overlay:drag-preview:alpha" → line from pointer to object center
+"object:alpha:body"          → stays at original position
+"object:alpha:label"         → stays with body
+"overlay:drag-preview:alpha" → ghost of object rendered at computed destination;
+                               coords update via canvas.coords() each cycle
 ```
 
 ### During resize:

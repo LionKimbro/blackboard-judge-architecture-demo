@@ -2,7 +2,15 @@
 
 ## Purpose
 
-This manual describes the **Tokenizer–Organism Interaction Architecture** for Tkinter Canvas applications. It defines a structured pipeline for implementing complex, multi-gesture user interactions with strict separation between perception, behavior, coordination, and rendering.
+This manual describes the **Blackboard-Judge Interaction Architecture** for Tkinter Canvas applications. It defines a structured pipeline for implementing complex, multi-gesture user interactions with strict separation between perception, behavior, coordination, and rendering.
+
+The architecture's central insight is the **Judge**: a single coordination arbiter that insulates organisms from each other. An organism can be transplanted from one program to another — provided the world model is compatible — by rewiring the Judge and adjusting registration order, without modifying the organism itself. The organism is modular because it never encodes knowledge of other organisms; the Judge absorbs all of that.
+
+The **Tokenizer/Organism split** complements this by keeping organism code clean: shared perceptual computations (hit-testing, drag thresholds, button transitions) live in tokenizers and are read by all organisms from `DERIVED`, rather than being duplicated inside each organism. This is a valuable optimization for maintainability, but it is not the source of modularity. Organisms coordinating through a Judge would remain modular even if they each performed their own environment sensing.
+
+The blackboard — `RAW`, `DERIVED`, and the world model — is the shared medium through which all layers communicate without direct coupling.
+
+**Projection** closes the loop. Organisms never touch the canvas directly; they emit effects, which mutate the world model or signal transient overlays. Projection then reconciles the current world model and volatile effects against the canvas, issuing the minimal set of create, update, and delete operations needed to bring it in sync. This keeps the canvas a pure view: it carries no authoritative state, imposes no constraints on organisms, and can be reconstructed at any time from the world model alone.
 
 ---
 

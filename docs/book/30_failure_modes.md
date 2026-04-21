@@ -55,28 +55,34 @@ function handle_drag_idle(organism):
 
 ---
 
-## 3. The Judge Becoming a Complex Logic Engine
+## 3. Organisms Encoding Coordination Logic
 
-**Description:** The Judge accumulates application-specific rules — priority overrides, gesture-type awareness, modifier-key checks — and grows into a routing layer that understands user intent.
+**Description:** An organism encodes priority or yielding rules relative to other organisms — checking conditions that have no bearing on whether the organism is applicable, but instead encode assumptions about what other organisms are doing or should win.
 
 **Example:**
 ```
-function get_permission(request_type, resources):
-    -- VIOLATION: judge applying application rules
-    if current_organism == "drag-object" and "node-A" in world.selection:
-        -- prefer group drag
-        return False
-    if current_organism == "marquee-select" and RAW.current.shift_down:
-        -- shift-marquee means additive selection, not allowed during drag
-        return False
+function handle_drag_idle(organism):
+    target ← DERIVED.current.pointer_target
+    if target is None:
+        return
+
+    -- VIOLATION: organism encodes priority logic about group-drag
+    if target in world.selection:
+        return   -- "let group-drag handle it"
+
+    get_permission("START", [target, "pointer"])
     ...
 ```
 
-**Why this is wrong:** The Judge now must understand what "drag-object" means, what selection state implies, and what shift-marquee is. Any change to interaction behavior requires changing the Judge. Organisms can no longer be reasoned about independently — their behavior depends on opaque rules in the Judge.
+**Why this is wrong:** The organism is now making a decision that belongs to the Judge: "group-drag should take precedence when the target is selected." This hides coordination policy inside an organism, creates invisible coupling between organisms, and makes both harder to reuse. If the priority rule changes, the organism must change — even though it is otherwise unaffected. If a new organism is added, all existing organisms that might yield to it must be updated.
 
-**Symptom:** Adding a new organism requires modifying the Judge. The Judge grows steadily. Bugs in interaction priority appear in the Judge rather than in the organism responsible for the behavior.
+**Symptom:** Removing or reordering organisms changes behavior in ways that are hard to trace. Organisms contain conditions that only make sense in relation to other organisms. Priority bugs are found scattered across organism handlers rather than in one place.
 
-**Correct form:** Priority and yielding logic belongs in the organisms themselves. An organism that should yield to another does so by checking conditions before calling `get_permission()`, or by checking its own state. The Judge only checks resource availability.
+**Correct form:** An organism determines applicability from `RAW` and `DERIVED` only — the perceptual facts about what is happening in the world. All conflict resolution is the Judge's responsibility, expressed through resource contention and registration order (or an explicit bid policy). No organism contains the phrase "let X handle it."
+
+When the Judge feels too complex, the answer is to refine the coordination model — resource granularity, request types, phases, bid policy — not to push priority logic into organisms. Organisms remain reusable and unaware of each other; the Judge gets better tools.
+
+**Note on the Judge's role:** The Judge *does* own conflict-resolution policy. Resource rules, registration order, and bid-based priority are all legitimate Judge concerns. The Judge may also consult `RAW` or `DERIVED` — for example, using `shift_down` or `pointer_target` to inform a priority decision — provided that policy remains centralized and organisms remain unaware of each other. What the Judge must not do is depend on organism names or embed per-gesture special cases: rules of the form "if the requesting organism is drag-object and the target is selected, deny" couple the Judge to specific organism identities and make the policy opaque. Prefer resource granularity, registration order, and bids over modifier-key or name-based branching in the Judge. When the Judge does read RAW/DERIVED, it should be for general policy (e.g., a global mode flag), not for gesture-specific routing.
 
 ---
 
