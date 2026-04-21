@@ -70,7 +70,7 @@ function handle_drag_idle(organism):
     if target in world.selection:
         return   -- "let group-drag handle it"
 
-    get_permission("START", [target, "pointer"])
+    get_permission("CHECK", [target, "pointer"])
     ...
 ```
 

@@ -42,7 +42,7 @@ function organism_NAME(organism):
 
 function handle_idle(organism):
     -- Wait for triggering condition.
-    -- If condition met, request START from Judge.
+    -- If condition met, request CHECK from Judge.
     -- On grant: record held resources, advance to ARMED or ACTIVE.
     -- On denial: stay IDLE.
 
@@ -64,8 +64,8 @@ function clear(organism):
 
 ### Permission Calls
 
-- `get_permission("START", resources)` — called in IDLE when first arming. Checks that resources are uncontested.
-- `get_permission("HOLD-RESOURCE", resources)` — called when the gesture escalates (e.g., threshold crossed). Locks resources exclusively.
+- `get_permission("CHECK", resources)` — called in IDLE when first arming. Soft feasibility test: verifies resources are uncontested, but does not lock them.
+- `get_permission("COMMIT", resources)` — called when the gesture escalates (e.g., threshold crossed). Hard lock: claims resources exclusively. This is where conflicts between simultaneously-ARMED organisms are resolved.
 
 Both calls return a boolean. On denial, the organism calls `clear()` and returns.
 
@@ -85,7 +85,7 @@ function organism_hover_highlight(organism):
     if target is None:
         return
 
-    if not get_permission("START", []):
+    if not get_permission("CHECK", []):
         return
 
     emit_effect("volatile", "hover-highlight", { object_id: target })
@@ -120,7 +120,7 @@ function handle_drag_idle(organism):
     if target is None:
         return
 
-    if not get_permission("START", [target, "pointer"]):
+    if not get_permission("CHECK", [target, "pointer"]):
         clear(organism)
         return
 
@@ -144,7 +144,7 @@ function handle_drag_armed(organism):
     if not DERIVED.current.drag_threshold_crossed:
         return
 
-    if not get_permission("HOLD-RESOURCE", [organism.held.object_id, "pointer"]):
+    if not get_permission("COMMIT", [organism.held.object_id, "pointer"]):
         clear(organism)
         return
 
@@ -197,7 +197,7 @@ function handle_marquee_idle(organism):
     if DERIVED.current.pointer_target is not None:
         return    -- pointer is on an object, not empty space
 
-    if not get_permission("START", ["pointer"]):
+    if not get_permission("CHECK", ["pointer"]):
         clear(organism)
         return
 
@@ -256,7 +256,7 @@ function handle_group_idle(organism):
         return
 
     selected ← list(world.selection)
-    if not get_permission("START", selected):
+    if not get_permission("CHECK", selected):
         clear(organism)
         return
 
@@ -276,7 +276,7 @@ function handle_group_armed(organism):
     if not DERIVED.current.drag_threshold_crossed:
         return
 
-    if not get_permission("HOLD-RESOURCE", organism.held.object_ids):
+    if not get_permission("COMMIT", organism.held.object_ids):
         clear(organism)
         return
 
@@ -309,7 +309,7 @@ function handle_group_dragging(organism):
 
 ## Organism Ordering
 
-Organisms run in registration order each cycle. Order determines implicit priority: if two organisms would both attempt to claim the same resource at START, the one earlier in the list gets the grant; the later one is denied.
+Organisms run in registration order each cycle. Order determines implicit priority: multiple organisms may pass CHECK and enter ARMED simultaneously. When the threshold is crossed, they race to COMMIT in registration order. The first to reach COMMIT wins; later organisms find the resource locked and clear.
 
 Design the registration order to reflect intended priority. Document the reasoning when order is load-bearing.
 

@@ -10,7 +10,7 @@ function organism_GESTURE(organism):
         -- Detect triggering condition.
         if not [trigger condition]:
             return
-        if not get_permission("START", [resources]):
+        if not get_permission("CHECK", [resources]):
             return
         organism.held ← [committed context]
         organism.data ← [working data]
@@ -24,7 +24,7 @@ function organism_GESTURE(organism):
             return
         if not drag_threshold_crossed:
             return
-        if not get_permission("HOLD-RESOURCE", [resources]):
+        if not get_permission("COMMIT", [resources]):
             clear(organism)
             return
         organism.state ← "ACTIVE"
@@ -55,7 +55,7 @@ function organism_HIGHLIGHT(organism):
     if not condition:
         return
 
-    if not get_permission("START", []):
+    if not get_permission("CHECK", []):
         return
 
     emit_effect("volatile", [effect], [payload])

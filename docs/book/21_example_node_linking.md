@@ -61,7 +61,7 @@ condition:
     AND button_1_pressed is True
     AND pointer_target == "node-A"  (not None)
 
-get_permission("START", ["pointer", "edge-create"])
+get_permission("CHECK", ["pointer", "edge-create"])
   -- pointer_owner is None → granted
 
 organism.data ← { source_id: "node-A" }
@@ -83,7 +83,7 @@ condition: drag_threshold_crossed is False
 state: ARMED
 condition: drag_threshold_crossed is True
 
-get_permission("HOLD-RESOURCE", ["pointer", "edge-create"])
+get_permission("COMMIT", ["pointer", "edge-create"])
   -- granted; pointer locked to edge-create organism
 
 organism.state ← "ACTIVE"
@@ -193,9 +193,9 @@ The preview line is redrawn each cycle as the pointer moves. `reconcile()` calls
 
 ## Interaction With Other Organisms
 
-On a Shift+press-on-node, `edge-create`, `node-drag`, and `group-drag` may all pass their START checks and move to ARMED simultaneously. START is a soft check — it locks nothing. All three organisms wait, armed, watching for the drag threshold.
+On a Shift+press-on-node, `edge-create`, `node-drag`, and `group-drag` may all pass their CHECK requests and move to ARMED simultaneously. CHECK is a soft feasibility test — it locks nothing. All three organisms wait, armed, watching for the drag threshold.
 
-When the threshold is crossed, all three attempt HOLD in registration order. The first to succeed locks the pointer; the others are denied and clear. No organism knows the others exist or why it was denied.
+When the threshold is crossed, all three attempt COMMIT in registration order. The first to succeed locks the pointer; the others are denied and clear. No organism knows the others exist or why it was denied.
 
 **Registration order is therefore load-bearing.** `edge-create` must be registered before `node-drag` and `group-drag`. That ordering is the sole mechanism by which edge creation takes priority over dragging when Shift is held. It must be treated as part of the system's specification, not an implementation detail.
 

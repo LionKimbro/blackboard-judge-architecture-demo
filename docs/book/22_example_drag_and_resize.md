@@ -54,7 +54,7 @@ condition:
     button_1_pressed AND target is not None
     AND pointer_handle_target is None
 
-get_permission("START", [target, "pointer"])
+get_permission("CHECK", [target, "pointer"])
   -- target not held → granted
 
 emit_effect("persistent", "set-selection", { object_ids: [target] })
@@ -89,7 +89,7 @@ clear(organism)
 state: ARMED
 condition: drag_threshold_crossed is True
 
-get_permission("HOLD-RESOURCE", [organism.held.object_id, "pointer"])
+get_permission("COMMIT", [organism.held.object_id, "pointer"])
   -- target not held by another organism → granted
 
 organism.state ← "DRAGGING"
@@ -147,7 +147,7 @@ target ← handle_target.object_id
 handle ← handle_target.handle
 obj    ← world.objects[target]
 
-get_permission("START", [target, "pointer"])
+get_permission("CHECK", [target, "pointer"])
   -- If drag-object already holds target: denied → clear, return.
   -- Otherwise: granted.
 
@@ -162,7 +162,7 @@ organism.state ← "ARMED"
 ### Threshold and HOLD-RESOURCE (same as drag):
 
 ```
-get_permission("HOLD-RESOURCE", [organism.held.object_id, "pointer"])
+get_permission("COMMIT", [organism.held.object_id, "pointer"])
   -- If drag-object holds the target: denied → clear.
   -- Otherwise: granted.
 
@@ -213,7 +213,7 @@ function apply_resize(payload):
 Suppose drag-object has just claimed `HOLD-RESOURCE` on `target` (it is in DRAGGING state). In the same cycle, resize-object attempts `START` on the same object:
 
 ```
-get_permission("START", [target, "pointer"])
+get_permission("CHECK", [target, "pointer"])
   -- resource_holds[target] == "drag-object" ≠ "resize-object"
   -- denied
   → clear(resize-object organism)

@@ -83,3 +83,5 @@ On startup, a single **priming cycle** runs before any events arrive. It establi
 | `30_failure_modes.md` | Anti-patterns and how they manifest |
 | `31_design_notes.md` | Design rationale |
 | `32_appendix_patterns.md` | Reusable pseudocode patterns |
+| `33_appendix_judge-bid-model.md` | Optional bid-based judge variant |
+| `34_appendix_historical-note.md` | Former terminology (START, HOLD-RESOURCE, architecture name) |

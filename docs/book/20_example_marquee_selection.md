@@ -66,7 +66,7 @@ DERIVED.current.region_candidates ← []
 state: IDLE
 condition: button_1_pressed AND pointer_target is None
 
-get_permission("START", ["pointer"])
+get_permission("CHECK", ["pointer"])
   -- pointer_owner is None → granted
 
 organism.data ← { press_point: { x: RAW.x, y: RAW.y } }

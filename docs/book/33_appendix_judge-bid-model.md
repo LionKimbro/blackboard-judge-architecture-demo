@@ -6,7 +6,7 @@
 
 ## When to Consider This
 
-The default START/HOLD model resolves conflicts by registration order: the first organism to successfully call `get_permission("HOLD")` wins. This is simple, predictable, and sufficient for most applications.
+The default CHECK/COMMIT model resolves conflicts by registration order: the first organism to successfully call `get_permission("COMMIT")` wins. This is simple, predictable, and sufficient for most applications.
 
 It becomes awkward when:
 
@@ -168,7 +168,7 @@ What must remain constant across variations:
 
 ## Comparison With START/HOLD
 
-| | START/HOLD | Bid-Based |
+| | CHECK/COMMIT | Bid-Based |
 |---|---|---|
 | Conflict resolution | Registration order | Policy function in judge |
 | Policy location | Implicit (organism list order) | Explicit (judge) |

@@ -38,12 +38,12 @@ Permission protocol:
 function get_permission(request_type):
     owner ← current_organism.name
 
-    if request_type == "START":
+    if request_type == "CHECK":
         if pointer_owner not in (None, owner):
             return False
         return True
 
-    if request_type == "HOLD":
+    if request_type == "COMMIT":
         if pointer_owner not in (None, owner):
             return False
         pointer_owner ← owner
@@ -61,13 +61,13 @@ function maintain_judge():
         pointer_owner ← None
 ```
 
-This is sufficient for most applications. Only one organism can be ACTIVE at a time because only one organism can hold the pointer. Conflicts resolve naturally: the first organism to call `get_permission("HOLD")` wins; later organisms find the pointer taken and clear themselves.
+This is sufficient for most applications. Only one organism can be ACTIVE at a time because only one organism can hold the pointer. Conflicts resolve naturally: the first organism to call `get_permission("COMMIT")` wins; later organisms find the pointer taken and clear themselves.
 
 ### Two Request Types
 
-**START** — called when an organism begins its ARMED phase. Soft check: is the pointer free (or already mine)? Does not lock the pointer.
+**CHECK** — called when an organism begins its ARMED phase. Soft check: is the pointer free (or already mine)? Does not lock the pointer.
 
-**HOLD** — called when the organism commits to an active gesture (e.g., drag threshold crossed). Hard lock: sets `pointer_owner` to this organism.
+**COMMIT** — called when the organism commits to an active gesture (e.g., drag threshold crossed). Hard lock: sets `pointer_owner` to this organism.
 
 The two-phase design avoids premature locking. An organism in ARMED is watching for intent confirmation; it has not committed. If the user releases before the threshold, the organism clears without ever having locked the pointer.
 
@@ -93,13 +93,13 @@ Permission protocol (extended):
 function get_permission(request_type, resources=[]):
     owner ← current_organism.name
 
-    if request_type == "START":
+    if request_type == "CHECK":
         for resource in resources:
             if resource_holds.get(resource) not in (None, owner):
                 return False
         return True
 
-    if request_type == "HOLD":
+    if request_type == "COMMIT":
         for resource in resources:
             if resource_holds.get(resource) not in (None, owner):
                 return False

@@ -20,11 +20,11 @@ The Judge must remain minimal to preserve this property. If application logic en
 
 ## Why Two Permission Types?
 
-`START` and `HOLD-RESOURCE` serve different purposes.
+`CHECK` and `COMMIT` serve different purposes.
 
-`START` is a soft claim. It checks that the interaction is not already contested but does not lock the resource. This allows an organism to begin its ARMED phase — where it is watching for confirmation that the gesture is real — without preventing other organisms from also starting. Multiple organisms may be ARMED simultaneously on different resources.
+`CHECK` is a soft feasibility test. It verifies that the resources the organism needs are not already locked by another, but does not lock them. This allows an organism to begin its ARMED phase — where it is watching for confirmation that the gesture is real — without preventing other organisms from also arming. Multiple organisms may be ARMED simultaneously, all having passed their CHECK.
 
-`HOLD-RESOURCE` is a hard lock. It is called when the gesture has been confirmed (threshold crossed, intent established). At this point, the resource is locked exclusively. Only one organism may hold a given resource.
+`COMMIT` is a hard lock. It is called when the gesture has been confirmed (threshold crossed, intent established). At this point, the resource is locked exclusively. Only one organism may hold a given resource. This is where conflicts are resolved: the first organism to call `COMMIT` for a contested resource wins; later organisms are denied and clear.
 
 This two-phase design avoids premature locking. A single-click followed by a release should not leave a resource locked for the entire click duration if the organism never progressed past ARMED. The lock is acquired only when the intent is established.
 
@@ -76,7 +76,9 @@ The cost is that organisms must be written to be inexpensive when idle. An organ
 
 ## Organism Registration Order as Priority
 
-Organism priority is determined by registration order. The first organism to successfully call `get_permission("START", ...)` for a given resource wins; later organisms are denied.
+Organism priority is determined by registration order. When multiple organisms have passed `CHECK` and entered ARMED, they race to `COMMIT` when the threshold is crossed. Because organisms run in registration order each cycle, the first one in the list reaches `COMMIT` first; later organisms find the resource locked and clear themselves.
+
+`CHECK` does not determine priority — it only tests feasibility. Multiple organisms may pass `CHECK` and be ARMED simultaneously. Priority is resolved at `COMMIT` time, by registration order.
 
 This is a deliberate simplification. An explicit priority system would require organisms to declare priorities, and the Judge to compare them. With registration order, the priority is expressed structurally: the list of organisms is the policy.
 
