@@ -1,0 +1,639 @@
+{
+  "document": {
+    "document-id": "blackboard-judge-architecture.raw.world-model-reducer-core-blackboard-judge-projection.v1",
+    "title": "World Model, Reducer Core, Blackboard-Judge, and Projection",
+    "tags": [
+      "blackboard-judge",
+      "reducer-core",
+      "world-model",
+      "projection",
+      "compositor",
+      "interaction-architecture",
+      "state-management",
+      "architecture-research",
+      "raw-notes"
+    ],
+    "purpose": "Preserve and develop the architectural insight that interactive software can be cleanly separated into four cooperating parts: Blackboard-Judge for continuous interaction, Reducer Core for discrete semantic/session transitions, World Model for large durable modeled reality, and Projection/Compositor for visual manifestation.",
+    "type": {
+      "logical": {
+        "base": "file",
+        "format": "json",
+        "encoding": "utf-8"
+      },
+      "semantic": {
+        "base": "architecture-note",
+        "status": "raw-development-document"
+      }
+    },
+    "status": "raw",
+    "created": "2026-05-10",
+    "author": [
+      "Lion Kimbro",
+      "Wing-Cat (ChatGPT)"
+    ],
+    "intended-path": "f:/lion/github/blackboard-judge-architecture-demo/docs/raw/20__world-model_reducer-core_blackboard-judge_projection.json",
+    "depends-on": [
+      "interaction-architecture-blackboard-judge.v1",
+      "lions-docs.description.json-document-format-for-llms.v1",
+      "lions_dictionary_for_llms"
+    ],
+    "conversation-context": "Developed from a conversation about integrating Blackboard-Judge with Reducer Core, recognizing World Model as a third architecture and Projection/Compositor as a fourth.",
+    "conversation": "https://chatgpt.com/c/6a00c521-5124-83e8-a705-595b74801e9e"
+  },
+  "orientation": {
+    "summary": "This document captures an evolving architecture for interactive applications in which the system is not treated as one monolithic state machine. Instead, interaction continuity, semantic transition, durable modeled reality, and rendering are separated into distinct cooperating architectural parts.",
+    "core-thesis": "Reducer state is not reality itself. Reducer state is orientation within reality.",
+    "secondary-thesis": "Blackboard-Judge lives in continuity; Reducer Core lives in discrete semantic events; World Model lives in modeled reality, often large, partially persistent, and independently managed; Projection lives in immediate manifestation.",
+    "why-this-matters": [
+      "Many GUI architectures blur interaction state, application state, document state, rendering state, and world state into one confused maze.",
+      "Reducer architectures are powerful, but they can become bloated or pathological if asked to contain enormous world state directly.",
+      "Blackboard-Judge is strong at continuous interaction and coordination law, but not at do/undo, durable semantic histoyr, or unified execution logic across the entire system.",
+      "World models are often huge, and require their own logic to load, store, version, and maintain.",
+      "Projection/compositing has its own logic: reconciliation between intended visual state and actual displayed artifacts."
+    ]
+  },
+  "four-part-model": {
+    "overview": "The architecture distinguishes four major parts, each with its own responsibility, temporality, and state discipline.",
+    "parts": {
+      "blackboard-judge": {
+        "role": "Continuous embodied interaction ecology.",
+        "responsibilities": [
+          "Read raw input and derived perceptual fields.",
+          "Run tokenizers that convert raw input into interpreted input facts.",
+          "Run organisms that recognize interaction episodes over time.",
+          "Use a judge to adjudicate ownership, holds, coordination, and gesture legitimacy.",
+          "Emit effects and/or logical events downstream."
+        ],
+        "time-style": "continuous / frame-evolution / episode-based",
+        "typical-state": [
+          "RAW",
+          "RAW-PREV",
+          "DERIVED",
+          "DERIVED-PREV",
+          "COORDINATION",
+          "organism STATE",
+          "organism HELD",
+          "organism DATA"
+        ],
+        "should-own": [
+          "hover recognition",
+          "drag thresholds",
+          "gesture recognition",
+          "pointer ownership",
+          "temporary interaction episodes",
+          "coordination law"
+        ],
+        "should-not-own": [
+          "entire durable application history",
+          "large persistent world state",
+          "full document model persistence",
+          "all undo/redo semantics"
+        ]
+      },
+      "reducer-core": {
+        "role": "Discrete semantic/session transition engine.",
+        "responsibilities": [
+          "Accept logical events that represent meaningful semantic actions.",
+          "Maintain compact reducer-owned state such as mode, selected tool, focused object, active panel, visible list, session orientation, and current world revision reference.",
+          "Emit commands or requests to the World Model when durable modeled reality should change.",
+          "Emit effects for UI/workspace consequences when appropriate.",
+          "Maintain a reducer history if useful, but not necessarily the full world undo history."
+        ],
+        "time-style": "discrete / event-based / transition-based",
+        "typical-state": [
+          "current-mode",
+          "active-tool",
+          "focused-panel",
+          "current-selection, if selection is treated as workspace state",
+          "current-world-guid or current-world-revision",
+          "visible-world-region",
+          "current-document-id",
+          "history-index or timeline cursor"
+        ],
+        "good-event-candidates": [
+          "MOVE_NODE",
+          "DELETE_ITEM",
+          "COMMIT_TEXT_EDIT",
+          "CREATE_EDGE",
+          "CREATE_ITEM",
+          "CHANGE_MODE",
+          "SET_ACTIVE_TOOL",
+          "NAVIGATE_TO_WORLD_REVISION"
+        ],
+        "bad-or-questionable-event-candidates": {
+          "BEGIN_SELECTION_BOX": "Probably not reducer-core state. This belongs to interaction-state or projection-preview state.",
+          "OPEN_CONTEXT_MENU": "Probably not reducer-core state. This is usually shell/UI state, not durable semantic state.",
+          "SET_SELECTION": "Borderline. It may be reducer state if selection is workspace/session state, but it may be purely interaction state in simpler programs."
+        },
+        "should-own": [
+          "semantic event interpretation",
+          "session/workspace orientation",
+          "mode/tool/focus state",
+          "references into world-state versions",
+          "commands to mutate durable world reality"
+        ],
+        "should-not-own": [
+          "massive datasets",
+          "all spatial indexes",
+          "all world caches",
+          "raw pointer motion",
+          "gesture arbitration",
+          "projection reconciliation details"
+        ]
+      },
+      "world-model": {
+        "role": "Large durable modeled reality engine.",
+        "responsibilities": [
+          "Store or manage the durable application reality: entities, nodes, edges, documents, encyclopedia-scale knowledge, geometry, assets, or other large modeled structures.",
+          "Apply world mutation commands received from the reducer core or equivalent semantic authority.",
+          "Maintain its own storage strategy, indexing, caching, serialization, and possibly its own undo/redo or version history.",
+          "Expose enough read/query surface for interaction, reducer, and projection layers to operate without requiring the reducer to contain all world data."
+        ],
+        "time-style": "durable / versioned / partially persistent / sometimes best-effort-reconstructable",
+        "typical-state": [
+          "entities",
+          "relationships",
+          "documents",
+          "geometry",
+          "large text bodies",
+          "indexes",
+          "spatial acceleration structures",
+          "search structures",
+          "derived caches",
+          "loaded/unloaded regions",
+          "world revisions or snapshots"
+        ],
+        "should-own": [
+          "large application reality",
+          "world-level mutation application",
+          "world-level validation",
+          "world-level serialization",
+          "world-level undo/redo when appropriate",
+          "world query and indexing mechanisms"
+        ],
+        "should-not-own": [
+          "raw UI gestures",
+          "semantic session mode",
+          "which GUI panel is active",
+          "every transient projection artifact"
+        ]
+      },
+      "projection": {
+        "role": "Visual manifestation and reconciliation layer.",
+        "alias": [
+          "projection",
+          "compositor"
+        ],
+        "responsibilities": [
+          "Read world state, reducer/session state, coordination state, and transient preview effects.",
+          "Determine what should be visible now.",
+          "Reconcile desired visual state against actual rendered artifacts.",
+          "Create, update, move, hide, or delete GUI/canvas/display artifacts as needed.",
+          "Keep rendering downstream from interaction recognition and semantic mutation."
+        ],
+        "time-style": "immediate / frame-present / reconciliation-based",
+        "typical-state": [
+          "desired visual artifacts",
+          "actual canvas items or rendered handles",
+          "mapping from world ids to projected ids",
+          "visual caches",
+          "preview artifacts",
+          "highlight artifacts"
+        ],
+        "should-own": [
+          "canvas item reconciliation",
+          "visual artifacts",
+          "projection caches",
+          "preview rendering",
+          "manifestation of world/reducer/coordination state"
+        ],
+        "should-not-own": [
+          "gesture law",
+          "semantic document mutation",
+          "large world storage",
+          "authoritative reducer transition logic"
+        ]
+      }
+    }
+  },
+  "flow-model": {
+    "basic-flow": [
+      "RAW input is sampled or received.",
+      "Tokenizers produce DERIVED perceptual facts.",
+      "Judge and organisms interpret continuous interaction episodes.",
+      "Judge and organisms emit projection effects and/or logical semantic events.",
+      "Reducer Core consumes semantic events and updates compact reducer/session state.",
+      "Reducer Core may emit world mutation commands, including the intended new world revision GUID.",
+      "World Model attempts to apply the command and associate the resulting world version with the supplied GUID.",
+      "Projection reads relevant state and effects, then reconciles visible artifacts."
+    ],
+    "diagram": "RAW -> TOKENIZERS -> JUDGE+ORGANISMS -> EVENTS/EFFECTS -> REDUCER CORE -> WORLD MODEL COMMANDS -> WORLD MODEL -> PROJECTION",
+    "more-explicit-diagram": [
+      "RAW",
+      "DERIVED",
+      "BLACKBOARD-JUDGE",
+      {
+        "emits": [
+          "transient projection effects",
+          "logical semantic events"
+        ]
+      },
+      "REDUCER-CORE",
+      {
+        "emits": [
+          "compact session-state updates",
+          "world mutation commands",
+          "additional effects"
+        ]
+      },
+      "WORLD-MODEL",
+      "PROJECTION/COMPOSITOR"
+    ]
+  },
+  "key-distinction-continuous-vs-discrete": {
+    "blackboard-judge": {
+      "model": "continuity",
+      "description": "Blackboard-Judge operates over ongoing temporal episodes. It is well-suited to hover, drag, resize, lasso, dwell, selection box drawing, pointer ownership, and coordination between competing interaction organisms."
+    },
+    "reducer-core": {
+      "model": "discrete events",
+      "description": "Reducer Core operates over meaningful semantic transitions. It is well-suited to events such as MOVE_NODE, DELETE_ITEM, COMMIT_TEXT_EDIT, and CHANGE_MODE."
+    },
+    "integration-rule": "Blackboard-Judge should not pass every low-level or continuous phenomenon into the reducer. It should emit reducer events only when something semantically meaningful has occurred or when session/workspace state should transition.",
+    "anti-pattern": "Do not confuse all events with history-worthy semantic events."
+  },
+  "event-classification": {
+    "purpose": "Classify events and state transitions according to which architectural part should probably own them.",
+    "classes": {
+      "interaction-events": {
+        "description": "Continuous or transient interaction phenomena.",
+        "owner": "blackboard-judge",
+        "examples": [
+          "pointer moved",
+          "button pressed",
+          "drag threshold crossed",
+          "begin selection box",
+          "hover target changed",
+          "organism acquired pointer hold"
+        ],
+        "notes": "These generally should not enter reducer history directly."
+      },
+      "semantic-events": {
+        "description": "Meaningful application actions or document/world mutations.",
+        "owner": "reducer-core as semantic interpreter; world-model as durable executor when needed",
+        "examples": [
+          "MOVE_NODE",
+          "DELETE_ITEM",
+          "COMMIT_TEXT_EDIT",
+          "CREATE_EDGE",
+          "CREATE_NODE"
+        ],
+        "notes": "These are strong candidates for reducer processing and possibly undo/redo."
+      },
+      "workspace-events": {
+        "description": "User working-context changes that are neither pure interaction nor pure durable world truth.",
+        "owner": "often reducer-core, but context-dependent",
+        "examples": [
+          "SET_SELECTION",
+          "SET_ACTIVE_TOOL",
+          "FOCUS_PANEL",
+          "OPEN_DOCUMENT",
+          "SET_VISIBLE_REGION",
+          "CHANGE_MODE"
+        ],
+        "notes": "Selection, focus, caret, viewport, scroll position, expansion state, and panel layout are liminal. They may belong in reducer state if they are meaningful to workflow, persistence, collaboration, or undo."
+      },
+      "shell-ui-events": {
+        "description": "Events belonging to outer GUI/application shell behavior.",
+        "owner": "outer UI shell or blackboard/projection layer, depending on system",
+        "examples": [
+          "OPEN_CONTEXT_MENU",
+          "SHOW_TOOLTIP_WINDOW",
+          "OPEN_MODAL_DIALOG"
+        ],
+        "notes": "These usually should not be treated as durable semantic reducer events."
+      },
+      "projection-effects": {
+        "description": "Transient visual consequences.",
+        "owner": "projection/compositor",
+        "examples": [
+          "draw drag rectangle",
+          "show hover highlight",
+          "show provisional resize outline",
+          "show insertion marker"
+        ],
+        "notes": "These may be emitted by Blackboard-Judge but rendered by Projection. They usually expire or are recomputed."
+      }
+    }
+  },
+  "world-model-independence": {
+    "summary": "The World Model can be usefully independent of the Reducer Core.",
+    "reasoning": [
+      "The world may be enormous: potentially an encyclopedia's worth of data, a large graph, a collection of documents, a spatial model, or a dataset with many indexes and caches.",
+      "The reducer does not need to contain the entire world in order to coordinate user intent.",
+      "The reducer may only need to know which mode the application is in, which world revision it is oriented toward, what list or panel is being shown, what tool is active, and what semantic operation has occurred.",
+      "The World Model may have its own processes, indexes, caches, serialization mechanics, and versioning discipline."
+    ],
+    "principle": "Reducer Core references the World Model; it does not necessarily contain it.",
+    "important-formula": "Reducer state is orientation within reality, not reality itself.",
+    "examples-of-world-model-contents": [
+      "millions of entities",
+      "documents or articles",
+      "large graph structures",
+      "geometry",
+      "images or assets",
+      "search indexes",
+      "spatial indexes",
+      "embedding spaces",
+      "computed caches",
+      "lazy-loaded regions",
+      "external file references"
+    ],
+    "examples-of-reducer-orientation-state": [
+      "current-world-guid",
+      "current-mode",
+      "active-tool",
+      "focused-panel",
+      "selected-world-entity-ids",
+      "visible-list-id",
+      "current-query",
+      "current-view-kind",
+      "history-cursor"
+    ]
+  },
+  "world-version-guid-discipline": {
+    "summary": "When the reducer emits a change to the World Model, it may also provide the GUID for the intended changed version of the World Model.",
+    "motivation": [
+      "Avoid requiring the World Model to communicate back synchronously with 'I changed, and here is the GUID.'",
+      "Preserve unidirectional semantic authority from reducer to world mutation request.",
+      "Keep causality clearer: the reducer declares the next intended world revision identity as part of the transition.",
+      "Allow the reducer to update its own compact state to point at the intended new world GUID."
+    ],
+    "pattern": {
+      "before": {
+        "reducer": "Emit world mutation command.",
+        "world-model": "Apply mutation and generate revision GUID.",
+        "reducer-followup": "Receive generated GUID and update reducer state."
+      },
+      "after": {
+        "reducer": "Generate or allocate next-world-guid.",
+        "reducer-command": "Emit world mutation command with target-world-guid.",
+        "reducer-state": "Silently update current-world-guid to target-world-guid as part of same reducer transition.",
+        "world-model": "Attempt to apply mutation and store or associate result with supplied target-world-guid."
+      }
+    },
+    "example-command": {
+      "command": "APPLY_WORLD_MUTATION",
+      "mutation": {
+        "type": "MOVE_NODE",
+        "node-id": "node:17",
+        "to": {
+          "x": 384,
+          "y": 212
+        }
+      },
+      "base-world-guid": "world-rev:8172",
+      "target-world-guid": "world-rev:8173"
+    },
+    "reducer-state-after-event": {
+      "current-world-guid": "world-rev:8173",
+      "last-semantic-event": "MOVE_NODE",
+      "mode": "select"
+    },
+    "notes": [
+      "The GUID supplied by the reducer is an intended revision identity, not necessarily proof that the World Model has successfully materialized it yet.",
+      "This pattern works best when the World Model can accept externally supplied revision IDs.",
+      "If the World Model cannot apply the change, the system needs an error or reconciliation path."
+    ]
+  },
+  "failure-and-reconciliation": {
+    "summary": "Large World Models may not always be able to reconstruct, apply, or return to a requested world version.",
+    "failure-cases": [
+      "The requested base revision is unavailable.",
+      "External files have changed or disappeared.",
+      "Caches or indexes cannot be reconstructed exactly.",
+      "A nondeterministic process produced different results.",
+      "A world mutation fails validation.",
+      "A historical snapshot was garbage-collected or never persisted.",
+      "A remote or streamed part of the world is unavailable."
+    ],
+    "possible-responses": [
+      {
+        "name": "strict-failure",
+        "description": "Reject the reducer transition or enter an error state if the world cannot realize the target GUID."
+      },
+      {
+        "name": "degraded-world-alignment",
+        "description": "Reducer points to intended-world-guid while World Model reports closest-available-world-guid or unresolved status."
+      },
+      {
+        "name": "reconciliation-event",
+        "description": "World Model emits or schedules a reconciliation signal, not as ordinary semantic authority but as a system health/update fact."
+      },
+      {
+        "name": "best-effort-materialization",
+        "description": "World Model approximates the requested world revision as closely as possible and records limitations."
+      }
+    ],
+    "important-distinction": {
+      "desired-world-guid": "The world revision identity that the reducer intended.",
+      "actual-world-guid": "The world revision identity that the World Model has actually materialized.",
+      "available-world-guid": "A world revision that the World Model can currently load or reconstruct.",
+      "reconciled": "Whether desired and actual state are in acceptable alignment."
+    },
+    "open-question": "Should the reducer core contain actual-world-guid as separate from desired-world-guid, or should that live in a system-status layer?"
+  },
+  "undo-redo-and-history": {
+    "summary": "Undo/redo may exist separately in the Reducer Core and World Model.",
+    "reducer-history": {
+      "description": "Reducer history records compact semantic/session transitions.",
+      "may-contain": [
+        "mode changes",
+        "selected tool changes",
+        "workspace orientation",
+        "semantic event sequence",
+        "current-world-guid references",
+        "history cursor"
+      ],
+      "may-not-contain": [
+        "entire world snapshots",
+        "all world diffs",
+        "all cache details"
+      ]
+    },
+    "world-history": {
+      "description": "World history records or reconstructs durable modeled reality.",
+      "may-contain": [
+        "world snapshots",
+        "world deltas",
+        "world event logs",
+        "revision DAGs",
+        "persistent storage commits",
+        "index rebuild metadata"
+      ],
+      "notes": [
+        "World history may be independent of reducer history.",
+        "World history may not be perfectly replayable.",
+        "World history may be garbage-collected, partial, best-effort, or externally constrained."
+      ]
+    },
+    "coordination-pattern": {
+      "description": "Reducer may hold an index, cursor, or GUID into world history rather than containing the world history.",
+      "example": {
+        "reducer-history-index": 42,
+        "current-world-guid": "world-rev:8173",
+        "previous-world-guid": "world-rev:8172"
+      }
+    },
+    "principle": "It is acceptable for the World Model to have a different undo/redo mechanism than the Reducer Core."
+  },
+  "selection-as-borderline-state": {
+    "summary": "SET_SELECTION is a liminal event because selection can be interaction state, workspace state, or semantically meaningful state depending on the application.",
+    "selection-probably-not-reducer": [
+      "temporary hover-like selection",
+      "drag-box preview selection before release",
+      "purely visual highlight",
+      "selection that should vanish when gesture ends"
+    ],
+    "selection-probably-reducer": [
+      "selection that affects later commands",
+      "selection that should be restored by undo/redo",
+      "selection that should persist across save/load of workspace",
+      "selection that should be synchronized in collaboration",
+      "selection that defines current editing context"
+    ],
+    "possible-rule": "Selection belongs to reducer state when it is part of the user's working context rather than merely part of the current gesture.",
+    "open-question": "Should selection be represented as reducer-owned workspace state, world-owned document state, or blackboard-owned interaction state in the first demo?"
+  },
+  "projection-and-compositor-notes": {
+    "summary": "Projection/Compositor is the fourth architecture and deserves its own treatment.",
+    "role-in-this-model": [
+      "Projection is downstream from World Model, Reducer Core, Blackboard-Judge coordination, and transient effects.",
+      "It translates state and effects into visible artifacts.",
+      "It should reconcile desired presentation against actual toolkit objects rather than letting interaction code directly own rendering."
+    ],
+    "possible-book-topics": [
+      "desired-vs-actual projection state",
+      "canvas item registries",
+      "artifact lifecycle",
+      "visual identity mapping",
+      "preview artifacts",
+      "render invalidation",
+      "view transforms",
+      "layering and z-order",
+      "projection of large worlds",
+      "projection under partial world availability"
+    ],
+    "working-question": "Should this architecture call the fourth part Projection, Compositor, or Projection/Compositor?"
+  },
+  "implementation-skeleton-idea": {
+    "summary": "Rather than writing a full book for every part immediately, create a reusable project skeleton that embodies the four-part architecture.",
+    "motivation": [
+      "The full Blackboard-Judge book took significant time to write.",
+      "Reducer Core is frequently referenced but not yet canonically documented.",
+      "Implementations currently feel inconsistent or uncontrolled.",
+      "A skeleton can provide immediate consistency while allowing the books to develop later."
+    ],
+    "possible-folder-layout": {
+      "app/": "Application lifecycle and wiring.",
+      "interaction/": "Blackboard-Judge tokenizers, organisms, judge, coordination field.",
+      "reducer/": "Reducer core, events, reducer state, transition functions.",
+      "world/": "World model engine, mutation commands, storage/versioning.",
+      "projection/": "Projection/compositor reconciliation.",
+      "docs/": "Architecture notes and project-specific documentation.",
+      "tests/": "Small deterministic tests for the four-part flow."
+    },
+    "possible-runtime-flow": [
+      "app collects raw input",
+      "interaction updates derived perception and coordination",
+      "interaction emits semantic events and projection effects",
+      "reducer consumes semantic events",
+      "reducer emits world commands with target world GUIDs",
+      "world applies commands",
+      "projection renders current visible state"
+    ],
+    "slogan": "IMPLEMENT LIKE THIS."
+  },
+  "book-and-documentation-roadmap": {
+    "summary": "The architecture suggests a possible tetralogy plus an integration volume.",
+    "possible-volumes": [
+      {
+        "title": "Blackboard-Judge",
+        "subject": "Continuous interaction, organisms, judge, coordination, and effects.",
+        "status": "already has a substantial book/document."
+      },
+      {
+        "title": "Reducer Core",
+        "subject": "Discrete semantic events, compact state, transition discipline, history, and workspace coordination.",
+        "status": "needed; currently implicit and inconsistently implemented."
+      },
+      {
+        "title": "World Model",
+        "subject": "Large durable modeled reality, versioning, storage, indexes, queries, and partial reconstruction.",
+        "status": "needed eventually."
+      },
+      {
+        "title": "Projection / Compositor",
+        "subject": "Visual manifestation, reconciliation, artifact lifecycles, and rendering as downstream projection.",
+        "status": "needed eventually."
+      },
+      {
+        "title": "The Four-Part Architecture",
+        "subject": "How the four systems cooperate, synchronize, and divide authority.",
+        "status": "integration volume; later."
+      }
+    ],
+    "near-term-practical-recommendation": "Create the skeleton first, then write smaller raw documents as discoveries arise, then consolidate into formal books only after repeated implementation experience."
+  },
+  "authority-and-communication": {
+    "summary": "The architecture benefits from clear directionality and authority boundaries.",
+    "principles": [
+      "Blackboard-Judge interprets embodied interaction but does not own all durable truth.",
+      "Reducer Core interprets semantic events and coordinates session/workspace state but does not contain the entire world.",
+      "World Model owns large modeled reality and its storage/indexing/versioning details.",
+      "Projection owns manifestation, not semantic truth.",
+      "Reducer-to-World commands should be explicit and version-aware.",
+      "World-to-Reducer communication should be limited, disciplined, and treated differently from ordinary semantic events."
+    ],
+    "desired-directionality": [
+      "Interaction emits semantic events to Reducer Core.",
+      "Reducer Core emits world mutation commands to World Model.",
+      "World Model exposes query/read surfaces and status.",
+      "Projection reads state and effects to render.",
+      "Errors or reconciliation facts may travel back, but should be modeled explicitly rather than becoming casual feedback loops."
+    ],
+    "anti-patterns": [
+      "World Model silently mutates reducer state.",
+      "Projection directly changes document truth.",
+      "Organisms directly mutate large world reality without semantic events.",
+      "Reducer history stores enormous world snapshots unnecessarily.",
+      "Every UI twitch becomes a reducer event."
+    ]
+  },
+  "open-questions": [
+    "What is the minimal Reducer Core book or skeleton needed to stabilize implementation practice?",
+    "Should the reducer always generate target-world-guid for world mutation commands?",
+    "Should desired-world-guid and actual-world-guid be distinct in reducer state?",
+    "How should the system react when the World Model cannot materialize the reducer's intended world GUID?",
+    "Where should SET_SELECTION live in the first demo?",
+    "Should context menus and tooltips be shell state, projection state, or blackboard effects?",
+    "What is the right boundary between World Model undo and Reducer Core undo?",
+    "Should the World Model expose immutable revision objects, mutable current state, or both?",
+    "Should Projection be called Projection, Compositor, or Projection/Compositor?",
+    "What is the smallest runnable skeleton that demonstrates all four parts without overengineering?"
+  ],
+  "slogans": [
+    "Reducer state is orientation within reality, not reality itself.",
+    "Blackboard-Judge lives in continuity.",
+    "Reducer Core lives in discrete semantic events.",
+    "World Model owns durable modeled reality.",
+    "Projection manifests; it does not decide truth.",
+    "Not every event deserves to become history.",
+    "The reducer may name the next world revision before the world realizes it.",
+    "The World Model can be version-addressable without being perfectly replayable.",
+    "IMPLEMENT LIKE THIS."
+  ],
+  "closing-note": {
+    "summary": "This is a raw development document. It preserves an architectural discovery before full canonization. The immediate next useful artifact may be a four-part implementation skeleton, followed later by a formal Reducer Core document and eventually a complete integration book."
+  }
+}
