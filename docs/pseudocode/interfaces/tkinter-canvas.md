@@ -28,11 +28,10 @@ Python `tkinter.Canvas`.
 - Only the projection module issues Canvas drawing operations.
 - Tokenizers use world geometry for current hit-testing in this demo, rather
   than treating Canvas items as semantic objects.
-- The re-render must choose and document either full redraw or retained-mode
-  reconciliation; see `../aspects/open-decisions.md`.
+- The re-render uses retained-mode reconciliation; see
+  `../adr/retained-mode-projection.md`.
 
 ## Documentation
 
 - `docs/book/15_projection.md`
 - `C:\lion\github\lions-documents\raw\0010__lions-tkinter-development-conventions_v1.json`
-

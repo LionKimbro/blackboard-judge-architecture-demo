@@ -22,13 +22,19 @@
 ## Rules
 
 - Runtime snapshots RAW and DERIVED before it replaces current-cycle values.
-- Tokenizers are the only DERIVED writers.  Organisms read DERIVED but do not
-  repair or augment it.
+- Tokenizers are the only DERIVED writers.  Each pass starts with an empty
+  current mapping; organisms read DERIVED but do not repair or augment it.
+- `DERIVED-PREV` receives an initialized baseline before the first cycle, then
+  receives the prior completed tokenizer output on later cycles.
 - The effect queue starts empty for each organism pass and is consumed in the
   same cycle.
 - World data changes only while routing world-mutation effects.
-- Current implementation names use hyphenated dictionary keys; the render may
+- The original implementation names use hyphenated dictionary keys; the render may
   normalize naming only if every affected contract and test is changed together.
+
+## Decision
+
+See [Recompute DERIVED Strictly Each Cycle](../adr/strict-derived-facts.md).
 
 ## Source Evidence
 
@@ -39,4 +45,3 @@
 
 - `docs/book/02_data_contracts.md`
 - `docs/book/10_raw.md`
-

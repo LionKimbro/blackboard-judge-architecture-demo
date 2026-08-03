@@ -36,6 +36,11 @@ line construction.
 ## ENSURES
 
 - The Canvas visibly reflects the world and current-frame preview effects.
+- Long-lived visual items reconcile by logical key: create missing items, update
+  changed items, and delete items no longer requested.
+- Immediate Canvas items are tagged `immediate`, deleted at the start of the
+  next projection pass, and recreated only when current volatile effects call
+  for them.
 - No drawing operation changes semantic world, organism, or coordination state.
 - Volatile effects disappear when not re-emitted in the next cycle.
 
@@ -44,9 +49,7 @@ line construction.
 - Input interpretation, gesture behavior, permission decisions, or world
   mutation.
 
-## Open Decision
+## Decision
 
-Select either full redraw for behavioral fidelity to the source demo or
-retained-mode reconciliation for fidelity to `docs/book/15_projection.md`.
-See `../aspects/open-decisions.md`.
-
+Use retained-mode reconciliation.  See
+[retained-mode-projection ADR](../adr/retained-mode-projection.md).

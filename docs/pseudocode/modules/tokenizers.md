@@ -36,6 +36,8 @@
   cycle.
 - Each fact is produced by its designated tokenizer, not recalculated by
   organisms.
+- Current DERIVED begins empty, so a missing required tokenizer fact is visible
+  rather than disguised by a default value.
 
 ## DOES NOT OWN
 
@@ -54,9 +56,10 @@
 
 ```text
 function run_tokenizers():
-    reset_current_derived_field()
+    set_current_derived_to_empty_mapping()
     for tokenizer in tokenizer_registry_in_order:
         if tokenizer.active:
             tokenizer.compute_its_facts()
 ```
 
+See [strict-derived-facts ADR](../adr/strict-derived-facts.md).

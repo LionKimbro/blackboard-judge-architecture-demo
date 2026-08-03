@@ -23,8 +23,8 @@ open decision without recording that change explicitly.
 ## Initial Scope
 
 This first breakdown describes the current canvas demo at roughly one or two
-levels above its Python implementation.  It deliberately preserves open
-decisions where the current source and later architecture manual differ.
+levels above its Python implementation.  Deliberate differences from the
+current source are recorded in `adr/` before they guide a render.
 
 ## Planned Render Map
 

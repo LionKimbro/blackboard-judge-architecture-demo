@@ -37,6 +37,7 @@ writers, and `get_permission()`.
 - At most one exclusive pointer gesture owns the pointer at a time.
 - Resource ownership is inspectable and released when stale.
 - The Judge contains no hit-testing, gesture semantics, or world mutation.
+- `CHECK` is a soft feasibility query; `COMMIT` is the hard resource claim.
 
 ## DOES NOT OWN
 
@@ -57,3 +58,4 @@ function get_permission(request, resources=[]):
     return False
 ```
 
+See [CHECK and COMMIT terminology ADR](../adr/check-commit-terminology.md).

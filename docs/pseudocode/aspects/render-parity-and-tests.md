@@ -29,7 +29,7 @@ behavior, except for any explicitly accepted open decision.
 - Tests should call the runtime with normalized input rather than require live
   Tk windows whenever possible.
 - Tests must use a replaceable monotonic clock.
-- A change caused by resolving an item in `open-decisions.md` must be stated in
+- A deliberate architectural difference from the source must cite its ADR in
   the relevant test and module sketch.
 
 ## Does Not Require
@@ -37,4 +37,3 @@ behavior, except for any explicitly accepted open decision.
 - Byte-for-byte source similarity.
 - Matching internal function names or dictionary layout when behavior and
   declared contracts are intentionally updated together.
-
