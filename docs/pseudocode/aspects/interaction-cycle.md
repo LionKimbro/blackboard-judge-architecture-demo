@@ -2,8 +2,8 @@
 
 ## Participating Modules
 
-`app-shell`, `runtime`, `tokenizers`, `judge`, `organisms`, `effects-world`,
-and `projection`.
+`canvas-host-window`, `timer`, `runtime`, `tokenizers`, `judge`, `organisms`,
+`effects-world`, and `projection`.
 
 ## Rule
 
@@ -31,7 +31,8 @@ project the resulting visible state
 
 ## System Rules
 
-- Input callbacks and periodic ticks both enter through this cycle.
+- Input callbacks from Canvas Host Window and periodic ticks from Timer both
+  enter through this cycle.
 - A periodic tick is allowed to run with no changed pointer data so temporal
   tokenizers can update.
 - No component may invoke a later architectural stage early or re-enter the
@@ -46,4 +47,3 @@ project the resulting visible state
 - `docs/book/00_overview.md`
 - `docs/book/01_core_principles.md`
 - `docs/book/10_raw.md`
-

@@ -3,7 +3,7 @@
 ## Source Evidence
 
 `src/demo/app.py` — state initialization, `run_cycle()`, snapshot handling,
-RAW population, and periodic tick functions.
+and RAW population.
 
 ## Render Target
 
@@ -15,7 +15,6 @@ RAW population, and periodic tick functions.
   records.
 - Cycle ordering and snapshot replacement.
 - RAW population from callback input and current UI setting.
-- Periodic idle-cycle scheduling.
 
 ## READS
 
@@ -42,7 +41,8 @@ RAW population, and periodic tick functions.
 - Tokenizers run before organisms.
 - All organisms run against one stable world state.
 - Effects route after organism execution and before projection.
-- A tick permits temporal facts to advance without new pointer motion.
+- A caller may invoke the cycle with no changed pointer data so temporal facts
+  can advance without new pointer motion.
 
 ## DOES NOT OWN
 
@@ -65,4 +65,3 @@ function run_cycle(raw-update, flags=[]):
 
 The initial render may use this same cycle as a priming cycle; no separate
 startup-only interaction path is required.
-

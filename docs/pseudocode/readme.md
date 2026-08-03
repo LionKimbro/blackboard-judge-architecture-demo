@@ -31,6 +31,8 @@ current source are recorded in `adr/` before they guide a render.
 | BAD sketch | Planned Python target |
 | --- | --- |
 | Application Shell | `src/bad_demo/app_shell.py` |
+| Canvas Host Window | `src/bad_demo/canvas_host_window.py` |
+| Periodic Timer | `src/bad_demo/timer.py` |
 | Interaction Runtime | `src/bad_demo/runtime.py` |
 | Tokenizers | `src/bad_demo/tokenizers.py` |
 | Judge | `src/bad_demo/judge.py` |

@@ -2,7 +2,7 @@
 
 ## Source Evidence
 
-`src/demo/app.py` — `main()`, `build_app()`, and Tk callback handlers.
+`src/demo/app.py` — `main()` and the root-window portion of `build_app()`.
 
 ## Render Target
 
@@ -10,53 +10,47 @@
 
 ## OWNS
 
-- Tk root/window creation and visible widget construction.
-- Canvas and quantization-checkbox bindings.
-- Thin conversion of Tk events into normalized runtime input updates.
-- Entering the Tk event loop after startup is complete.
+- Program setup orchestration.
+- Loading and applying program configuration (if any.)
+- Setting up tkinter to baseline standards:
+  - Creating and immediately withdrawing the Tk root runtime anchor.
+  - Orchestrating the start of the timer loop.
+- Kicking off the first Canvas Host window's creation.
+- Entering the Tk event loop after application composition is complete.
 
 ## READS
 
-- Tkinter event coordinates.
-- Runtime-facing application objects created during startup.
+- nothing
 
 ## CALLS
 
-- `runtime.initialize_demo_state()`.
-- `runtime.run_cycle(raw_update)`.
-- `runtime.schedule_periodic_tick()`.
+- `canvas_host_window.create_canvas_host_window()`.
+- `timer.start_periodic_timer()`
 
 ## MAY SAFELY ASSUME
 
 - Tkinter callbacks run on the Tkinter main thread.
-- Runtime owns interaction state; projection owns Canvas drawing.
 
 ## ENSURES
 
-- Every relevant input callback forwards normalized facts rather than gesture
-  interpretation.
-- The first state initialization and projection occur before `mainloop()`.
+- The Tk root stays hidden and exists only as the Tk runtime anchor.
+- The application is setup before calling 'mainloop()'.
 
 ## DOES NOT OWN
 
-- Raw/derived fact maintenance, gesture interpretation, coordination, world
-  mutation, or projection drawing.
+- Visible application windows.
+- Event-handler registration.
+- Timer scheduling.
+- Raw/Derived fact maintenance, gesture interpretation, coordination,
+  world mutation, or projection drawing.
 
 ## Sketch
 
 ```text
 function main():
-    build_visible_application()
-    initialize_demo_state()
-    run_cycle({})                 # priming state and first projection
-    schedule_periodic_tick()
+    create_and_withdraw_tk_root()
+    initialize_timer(tk_root)
+    create_canvas_host_window()
+    start_periodic_timer(TICK-MS, run_idle_cycle)
     enter_tk_event_loop()
-
-function handle_pointer_motion(event):
-    run_cycle({ x: event.x, y: event.y, inside-canvas: True })
-
-function handle_primary_button_press(event):
-    run_cycle({ x: event.x, y: event.y, inside-canvas: True,
-                button-1-down: True })
 ```
-

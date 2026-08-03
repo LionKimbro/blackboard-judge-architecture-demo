@@ -7,6 +7,8 @@
 - Rendered package target: `src/bad_demo/`.
 - User-interface toolkit: Python Tkinter.
 - Direct-manipulation surface: `tkinter.Canvas`.
+- Tk root policy: create and withdraw the root; visible application windows are
+  `tkinter.Toplevel` windows.
 - Test target: ordinary Python tests under `tests/`, runnable without opening a
   Tk window where practical.
 
