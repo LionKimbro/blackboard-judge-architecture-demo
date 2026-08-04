@@ -114,15 +114,21 @@ def test_dragging_a_selected_object_moves_the_entire_selection():
     assert runtime.world["objects"]["bravo"]["x"] == 350
 
 
-def test_drag_preview_contains_a_preview_for_every_dragged_object():
+def test_drag_preview_overrides_every_dragged_object_presentation():
     setup_bad_demo()
     runtime.world["selected-objects"] = ["alpha", "bravo"]
     post_press(100, 120, 1100)
     event_queue.post_pointer_motion(180, 210, 1200)
     runtime.run_update_cycle()
 
-    immediate_rectangles = [item for item in canvas_host_window.widgets["canvas"].items.values() if item["kind"] == "rectangle" and item["kwargs"].get("tags") == "immediate"]
-    assert len(immediate_rectangles) == 2
+    canvas = canvas_host_window.widgets["canvas"]
+    alpha = canvas.items[projection.g["items"]["object:alpha:body"]]
+    bravo = canvas.items[projection.g["items"]["object:bravo:body"]]
+
+    assert alpha["args"][:2] == (150, 180)
+    assert bravo["args"][:2] == (350, 310)
+    assert not [key for key in projection.g["items"] if key.startswith("handle:")]
+    assert not [item for item in canvas.items.values() if item["kwargs"].get("tags") == "immediate" and item["kind"] == "rectangle"]
 
 
 def test_projection_reuses_a_persistent_canvas_item():
