@@ -1,6 +1,7 @@
 """Shared Tk runtime facilities for the BAD-rendered demo."""
 
 import tkinter as tk
+import time
 
 
 g = {
@@ -20,3 +21,8 @@ def has_active_toplevels():
         if isinstance(widget, tk.Toplevel) and widget.winfo_exists():
             return True
     return False
+
+
+def now_ms():
+    """Return a monotonic timestamp for a normalized Tk input fact."""
+    return int(time.monotonic() * 1000)

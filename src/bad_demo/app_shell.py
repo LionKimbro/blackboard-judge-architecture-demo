@@ -7,6 +7,8 @@ will be rendered in their own modules.
 
 from . import timer
 from . import tk_runtime
+from . import canvas_host_window
+from . import interaction_runtime
 
 
 TICK_MS = 100
@@ -17,17 +19,10 @@ def main():
     tk_runtime.create_and_withdraw_root()
     timer.initialize_timer()
 
-    # Pending rendered modules:
-    # canvas_host_window.create_canvas_host_window()
-    # timer.start_periodic_timer(TICK_MS, interaction_runtime.run_update_cycle)
-    timer.start_periodic_timer(TICK_MS, handle_temporary_timer_callback)
+    canvas_host_window.create_canvas_host_window()
+    timer.start_periodic_timer(TICK_MS, interaction_runtime.run_update_cycle)
 
     tk_runtime.g["root"].mainloop()
-
-
-def handle_temporary_timer_callback():
-    """Stand in for Interaction Runtime until that module is rendered."""
-    return
 
 
 if __name__ == "__main__":

@@ -48,7 +48,10 @@
 
 - Pointer motion: delta, moving flag, and motionless duration.
 - Primary-button edges: pressed and released facts.
+- Primary-button click: a press, followed by a release, without mouse motion in between, and within a short time frame.
+- Primary-button double-click: (similar)
 - Pointer target: current, entered, and left object target.
+- ...and if the pointer target is a draggable model object, or a manipulation handle, or neither.
 - Resize handles: selected-object handle under the pointer.
 - Drag threshold: anchor on press and whether the threshold is crossed.
 
