@@ -10,7 +10,7 @@ world = {}
 system = {}
 
 config = {"canvas-width": 980, "canvas-height": 640, "playfield-right": 660,
-          "drag-threshold": 8, "handle-half": 6, "min-size": 40, "margin": 20,
+          "drag-threshold": 8, "click-duration-ms": 350, "handle-half": 6, "min-size": 40, "margin": 20,
           "quantization-step": 20}
 
 
@@ -26,8 +26,8 @@ def initialize_demo_state():
         "DERIVED": tokenizers.make_initial_derived(), "DERIVED-PREV": tokenizers.make_initial_derived(),
         "COORDINATION": {"pointer-owner": None, "active-gesture": None, "resource-holds": {}, "leases": {}, "judge-notes": []},
         "EFFECTS": [], "PREVIEWS": [],
-        "TOKENIZERS": [record("pointer-motion", tokenizers.tokenizer_pointer_motion), record("button-1", tokenizers.tokenizer_button_1), record("pointer-target", tokenizers.tokenizer_pointer_target), record("resize-handles", tokenizers.tokenizer_resize_handles), record("drag-threshold", tokenizers.tokenizer_drag_threshold)],
-        "ORGANISMS": [record("hover-highlight", organisms.organism_hover_highlight), record("resize-object", organisms.organism_resize_object), record("drag-selection-group", organisms.organism_drag_selection_group), record("drag-object", organisms.organism_drag_object), record("marquee-select", organisms.organism_marquee_select)]})
+        "TOKENIZERS": [record("pointer-motion", tokenizers.tokenizer_pointer_motion), record("button-1", tokenizers.tokenizer_button_1), record("pointer-target", tokenizers.tokenizer_pointer_target), record("resize-handles", tokenizers.tokenizer_resize_handles), record("pointer-draggable-target", tokenizers.tokenizer_pointer_draggable_target), record("button-1-click", tokenizers.tokenizer_button_1_click), record("drag-threshold", tokenizers.tokenizer_drag_threshold)],
+        "ORGANISMS": [record("hover-highlight", organisms.organism_hover_highlight), record("select-object-on-click", organisms.organism_select_object_on_click), record("resize-object", organisms.organism_resize_object), record("drag-objects", organisms.organism_drag_objects), record("marquee-select", organisms.organism_marquee_select)]})
 
 
 def record(name, fn):

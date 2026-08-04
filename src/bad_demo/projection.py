@@ -23,7 +23,7 @@ def render_projection(world, previews, config, raw):
     canvas.delete("immediate")
     desired = build_desired_state(world, config, raw)
     reconcile(canvas, desired)
-    draw_immediates(canvas, world, previews)
+    draw_immediates(canvas, world, previews, config)
 
 
 def build_desired_state(world, config, raw):
@@ -59,7 +59,7 @@ def create_item(canvas, spec):
     return getattr(canvas, f"create_{kind}")(*coords, **options)
 
 
-def draw_immediates(canvas, world, previews):
+def draw_immediates(canvas, world, previews, config):
     for effect in previews:
         payload, name = effect["payload"], effect["name"]
         if name == "hover-highlight":
@@ -67,5 +67,20 @@ def draw_immediates(canvas, world, previews):
             if obj: canvas.create_rectangle(obj["x"] - 4, obj["y"] - 4, obj["x"] + obj["w"] + 4, obj["y"] + obj["h"] + 4, outline="#f2c14e", width=3, tags="immediate")
         elif name == "marquee-preview":
             rect = payload["rect"]; canvas.create_rectangle(rect["x1"], rect["y1"], rect["x2"], rect["y2"], outline="#1f4f7a", dash=(4, 3), tags="immediate")
-        elif name in ("drag-preview", "group-drag-preview", "resize-preview"):
-            canvas.create_text(8, 8, text=name.replace("-", " "), anchor="nw", fill="#1f4f7a", tags="immediate")
+        elif name == "drag-preview":
+            for object_id, position in payload["positions"].items():
+                obj = world["objects"].get(object_id)
+                if obj:
+                    draw_preview_object(canvas, obj, position["x"], position["y"])
+        elif name == "resize-preview":
+            obj = world["objects"].get(payload["object-id"])
+            if obj:
+                rect = geometry.compute_resized_rect(payload["start-rect"], payload["handle"], payload["x"], payload["y"], config["playfield-right"], config["canvas-height"], config["min-size"], config["margin"])
+                draw_preview_object(canvas, obj, rect["x"], rect["y"], rect["w"], rect["h"])
+
+
+def draw_preview_object(canvas, obj, x, y, width=None, height=None):
+    width = obj["w"] if width is None else width
+    height = obj["h"] if height is None else height
+    canvas.create_rectangle(x, y, x + width, y + height, fill=obj["fill"], outline="#f2c14e", width=3, dash=(5, 3), tags="immediate")
+    canvas.create_text(x + 8, y + 8, text=obj["label"], anchor="nw", fill="white", tags="immediate")

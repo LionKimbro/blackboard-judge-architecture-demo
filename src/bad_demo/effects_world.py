@@ -31,9 +31,7 @@ def apply_world_effect(world, effect, config):
     payload = effect["payload"]
     if effect["name"] == "set-selection":
         world["selected-objects"] = list(payload["object-ids"])
-    elif effect["name"] == "move-object":
-        world["objects"][payload["object-id"]].update({"x": payload["x"], "y": payload["y"]})
-    elif effect["name"] == "move-group":
+    elif effect["name"] == "move-objects":
         for object_id, start in payload["start-positions"].items():
             world["objects"][object_id]["x"] = start["x"] + payload["dx"]
             world["objects"][object_id]["y"] = start["y"] + payload["dy"]

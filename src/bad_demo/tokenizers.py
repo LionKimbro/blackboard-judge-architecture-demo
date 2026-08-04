@@ -4,15 +4,15 @@ from . import geometry
 
 
 def make_initial_derived():
-    """Return only the prior-frame baseline used before the first cycle."""
     return {"moving": False, "dx": 0, "dy": 0, "motionless-duration": 0,
             "button-1-pressed": False, "button-1-released": False,
-            "pointer-target": None, "entered-target": None, "left-target": None,
+            "button-1-clicked": False, "single-click-draggable-target": None,
+            "pointer-target": None, "pointer-draggable-target": None,
+            "entered-target": None, "left-target": None,
             "pointer-handle-target": None, "drag-threshold-crossed": False}
 
 
 def run_tokenizers(system, world, config):
-    """Start DERIVED empty, then let each ordered tokenizer write its facts."""
     system["DERIVED"] = {}
     for tokenizer in system["TOKENIZERS"]:
         if tokenizer["ACTIVE"]:
@@ -34,10 +34,7 @@ def tokenizer_pointer_motion(system, world, config, tokenizer):
 def tokenizer_button_1(system, world, config, tokenizer):
     del world, config, tokenizer
     raw, previous = system["RAW"], system["RAW-PREV"]
-    system["DERIVED"].update({
-        "button-1-pressed": raw["button-1-down"] and not previous["button-1-down"],
-        "button-1-released": previous["button-1-down"] and not raw["button-1-down"],
-    })
+    system["DERIVED"].update({"button-1-pressed": raw["button-1-down"] and not previous["button-1-down"], "button-1-released": previous["button-1-down"] and not raw["button-1-down"]})
 
 
 def tokenizer_pointer_target(system, world, config, tokenizer):
@@ -52,10 +49,36 @@ def tokenizer_pointer_target(system, world, config, tokenizer):
 
 def tokenizer_resize_handles(system, world, config, tokenizer):
     del tokenizer
-    target = None
-    if system["RAW"]["inside-canvas"]:
-        target = geometry.find_resize_handle_at(world, system["RAW"]["x"], system["RAW"]["y"], config["handle-half"])
+    target = geometry.find_resize_handle_at(world, system["RAW"]["x"], system["RAW"]["y"], config["handle-half"]) if system["RAW"]["inside-canvas"] else None
     system["DERIVED"]["pointer-handle-target"] = target
+
+
+def tokenizer_pointer_draggable_target(system, world, config, tokenizer):
+    del world, config, tokenizer
+    target = system["DERIVED"]["pointer-target"]
+    system["DERIVED"]["pointer-draggable-target"] = target if target is not None and system["DERIVED"]["pointer-handle-target"] is None else None
+
+
+def tokenizer_button_1_click(system, world, config, tokenizer):
+    del world
+    d, raw = system["DERIVED"], system["RAW"]
+    d.update({"button-1-clicked": False, "single-click-draggable-target": None})
+    if d["button-1-pressed"]:
+        tokenizer["DATA"]["press"] = {"x": raw["x"], "y": raw["y"], "ms": raw["ms"], "moved": False}
+        return
+    press = tokenizer["DATA"].get("press")
+    if press is None:
+        return
+    if raw["button-1-down"] and d["moving"]:
+        press["moved"] = True
+    if not d["button-1-released"]:
+        return
+    same_place = press["x"] == raw["x"] and press["y"] == raw["y"]
+    timely = raw["ms"] - press["ms"] <= config["click-duration-ms"]
+    if same_place and not press["moved"] and timely:
+        d["button-1-clicked"] = True
+        d["single-click-draggable-target"] = d["pointer-draggable-target"]
+    tokenizer["DATA"]["press"] = None
 
 
 def tokenizer_drag_threshold(system, world, config, tokenizer):

@@ -12,8 +12,8 @@
 ## OWNS
 
 - Organism finite-state-machine records and organism-local held/data values.
-- Gesture behavior for hover, single-object drag, resize, marquee selection,
-  and selected-group drag.
+- Gesture behavior for hover, object dragging, resize, marquee selection, and
+  click selection.
 - Emission of semantic world-mutation and volatile projection-preview effects.
 
 ## READS
@@ -55,11 +55,12 @@
 - Hover highlight: stateless per-cycle preview when the pointer is available.
 - Resize object: handle press, threshold commit, resize preview and final
   resize effect.
-- Drag object: press, threshold commit, position preview and final move effect.
+- Drag objects: press, threshold commit, object-or-selection preview and final
+  move effect.
 - Marquee select: empty-space press, threshold commit, candidate preview and
   final selection effect.
-- Drag selection group: selected-object press, threshold commit, group preview
-  and final bounded move effect.
+- Select object on click: a tokenizer-derived click over a draggable object
+  emits the ordinary single-object selection effect.
 
 ## Pseudo-code
 
@@ -74,8 +75,7 @@ organisms_in_registration_order = [
     hover_highlight,
     organism_select_object_on_click,
     resize_object,
-    drag_selection_group,
-    drag_object,
+    drag_objects,
     marquee_select,
 ]
 
@@ -102,66 +102,78 @@ def clear_current_organism(organism):
 
 ```python
 def organism_hover_highlight():
-    if DERIVED.pointer_target is None:
-        return
+    if the pointer isn't over a draggable model object, get out
 
-    if Judge says pointer is held by another organism:
-        return
+    if Judge says pointer is held by another organism, get out
 
-    emit_projection_preview(
+    emit an immediate projection:
         "hover-highlight",
-        {"object-id": DERIVED.pointer_target},
-    )
+        {"object-id": the pointer target},
 ```
 
 Hover has no episode state and never claims the pointer.  Its effect exists for
 this projection pass only.
 
-### Single-Object Drag
+
+### Drag Objects
 
 ```python
-def organism_drag_object(organism):
+def organism_drag_objects(organism):
     IDLE state:
         if the left mouse button wasn't just pressed, get out.
-	if the mouse pointer isn't pointing at a draggable model object, get out.
-	  (note: a tokenizer identifies this.)
+        if the mouse pointer isn't pointing at a draggable model object, get out.
+          (note: a tokenizer identifies this.)
 
         ask the judge if permission to use the pointer is available --
-	  that is, CHECK permission: "pointer";  if it isn't, get out
+          that is, CHECK permission: "pointer"; if it isn't, get out.
 
         SUCCESS:
-	state <- ARMED
-	record the object-ID of the relevant object under the pointer
-	record the current mouse X, Y position (from RAW data)
-	record the object's current geometry
+        state <- ARMED
+
+        if the object under the pointer belongs to the committed selection:
+            record all object-IDs in the committed selection
+            record the starting X, Y positions of all selected objects
+        otherwise:
+            record the object-ID of the object under the pointer
+            record its starting X, Y position and current geometry
+
+        record the current mouse X, Y position (from RAW data)
 
     ARMED state:
-
         if the button is released, clear state to IDLE and get out.
 
         if we haven't passed the drag threshold, get out.
 
         ah, so we HAVE passed the drag threshold:
-          if we can't COMMIT permission to pointer and holding the object-id, clear state to IDLE and get out.
+        ask the Judge to COMMIT permission to the pointer and all object-IDs
+        being dragged; if it cannot, clear state to IDLE and get out.
+
+        emit the world effect:
+	    set-selection,
+	    object-ids = the object(s) being dragged
 
         state <- DRAGGING
 
     DRAGGING state:
-        calculate a proposed drag position, respecting clamping
+        calculate a proposed drag delta, respecting clamping for every object
+          being dragged.
 
-        emit a drag-preview for this object, at the proposed x,y position
+        emit a drag-preview for all objects being dragged, at their proposed
+          positions.
 
         if the left mouse button is released, emit:
-	    move-object,
-	    object-id,
-	    x,
-	    y
-	...and then clear state to IDLE.
+            move-objects,
+            object-ids,
+            starting positions,
+            dx,
+            dy
+        ...and then clear state to IDLE.
 ```
 
-The drag-preview payload is a proposed object position, not a request to mutate
-the world.  Projection must use it to display the object at the proposed
-position for this frame; see `projection.md`.
+The drag-preview payload is a proposed position for each affected object, not a
+request to mutate the world.  Projection must use it to display every affected
+object at its proposed position for this frame; see `projection.md`.
+
 
 ### Resize Object
 
@@ -247,54 +259,6 @@ def organism_marquee_select(organism):
         if DERIVED.button_1_released:
             emit_world_effect("set-selection", {"object-ids": candidates})
             clear_current_organism(organism)
-```
-
-### Selected-Group Drag
-
-```python
-def organism_drag_selection_group(organism):
-    IDLE state:
-        if the left mouse button wasn't just pressed, get out.
-        if the mouse pointer isn't pointing at a draggable model object, get out.
-          (note: a tokenizer identifies this.)
-        if the object under the pointer is not in the committed selection,
-          get out.
-        if the committed selection does not contain multiple objects, get out.
-
-        ask the judge if permission to use the pointer is available --
-          that is, CHECK permission: "pointer"; if it isn't, get out.
-
-        SUCCESS:
-        state <- ARMED
-        record the object-IDs in the committed selection
-        record the current mouse X, Y position (from RAW data)
-        record the starting X, Y positions of all selected objects
-
-    ARMED state:
-        if the button is released, clear state to IDLE and get out.
-
-        if we haven't passed the drag threshold, get out.
-
-        ah, so we HAVE passed the drag threshold:
-          ask the Judge to COMMIT permission to the pointer and all selected
-          object-IDs; if it cannot, clear state to IDLE and get out.
-
-        state <- DRAGGING
-
-    DRAGGING state:
-        calculate a proposed group delta, respecting clamping for the whole
-          selected group.
-
-        emit a group-drag-preview for all selected objects, at their proposed
-          positions.
-
-        if the left mouse button is released, emit:
-            move-group,
-            object-ids,
-            starting positions,
-            dx,
-            dy
-        ...and then clear state to IDLE.
 ```
 
 ### Select Object on Click

@@ -27,6 +27,8 @@ class FakeCanvas:
     def delete(self, item):
         if item == "immediate":
             self.immediate_deletes += 1
+            for item_id in [item_id for item_id, value in self.items.items() if value["kwargs"].get("tags") == "immediate"]:
+                self.items.pop(item_id)
             return
         self.items.pop(item, None)
 
@@ -97,6 +99,30 @@ def test_single_object_drag_updates_the_world_only_on_release():
 
     assert runtime.world["objects"]["alpha"]["x"] == 150
     assert runtime.world["objects"]["alpha"]["y"] == 180
+    assert runtime.world["selected-objects"] == ["alpha"]
+
+
+def test_dragging_a_selected_object_moves_the_entire_selection():
+    setup_bad_demo()
+    runtime.world["selected-objects"] = ["alpha", "bravo"]
+    post_press(100, 120, 1100)
+    event_queue.post_pointer_motion(180, 210, 1200)
+    post_release(180, 210, 1300)
+    runtime.run_update_cycle()
+
+    assert runtime.world["objects"]["alpha"]["x"] == 150
+    assert runtime.world["objects"]["bravo"]["x"] == 350
+
+
+def test_drag_preview_contains_a_preview_for_every_dragged_object():
+    setup_bad_demo()
+    runtime.world["selected-objects"] = ["alpha", "bravo"]
+    post_press(100, 120, 1100)
+    event_queue.post_pointer_motion(180, 210, 1200)
+    runtime.run_update_cycle()
+
+    immediate_rectangles = [item for item in canvas_host_window.widgets["canvas"].items.values() if item["kind"] == "rectangle" and item["kwargs"].get("tags") == "immediate"]
+    assert len(immediate_rectangles) == 2
 
 
 def test_projection_reuses_a_persistent_canvas_item():
