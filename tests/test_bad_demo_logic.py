@@ -131,6 +131,17 @@ def test_drag_preview_overrides_every_dragged_object_presentation():
     assert not [item for item in canvas.items.values() if item["kwargs"].get("tags") == "immediate" and item["kind"] == "rectangle"]
 
 
+def test_marquee_preview_draws_halos_around_candidate_objects():
+    setup_bad_demo()
+    post_press(40, 60, 1100)
+    event_queue.post_pointer_motion(450, 360, 1200)
+    runtime.run_update_cycle()
+
+    canvas = canvas_host_window.widgets["canvas"]
+    halos = [item for item in canvas.items.values() if item["kwargs"].get("tags") == "immediate" and item["kwargs"].get("outline") == "#f2c14e"]
+    assert len(halos) == 2
+
+
 def test_projection_reuses_a_persistent_canvas_item():
     setup_bad_demo()
     first_item = projection.g["items"]["object:alpha:body"]

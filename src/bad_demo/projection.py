@@ -90,6 +90,16 @@ def draw_immediates(canvas, world, previews, config):
         payload, name = effect["payload"], effect["name"]
         if name == "hover-highlight":
             obj = world["objects"].get(payload["object-id"])
-            if obj: canvas.create_rectangle(obj["x"] - 4, obj["y"] - 4, obj["x"] + obj["w"] + 4, obj["y"] + obj["h"] + 4, outline="#f2c14e", width=3, tags="immediate")
+            if obj:
+                draw_highlight_halo(canvas, obj)
         elif name == "marquee-preview":
-            rect = payload["rect"]; canvas.create_rectangle(rect["x1"], rect["y1"], rect["x2"], rect["y2"], outline="#1f4f7a", dash=(4, 3), tags="immediate")
+            rect = payload["rect"]
+            canvas.create_rectangle(rect["x1"], rect["y1"], rect["x2"], rect["y2"], outline="#1f4f7a", dash=(4, 3), tags="immediate")
+            for object_id in payload["object-ids"]:
+                obj = world["objects"].get(object_id)
+                if obj:
+                    draw_highlight_halo(canvas, obj)
+
+
+def draw_highlight_halo(canvas, obj):
+    canvas.create_rectangle(obj["x"] - 4, obj["y"] - 4, obj["x"] + obj["w"] + 4, obj["y"] + obj["h"] + 4, outline="#f2c14e", width=3, tags="immediate")

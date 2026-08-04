@@ -228,37 +228,41 @@ def organism_resize_object(organism):
 
 ```python
 def organism_marquee_select(organism):
-    if organism.state == IDLE:
-        if not DERIVED.button_1_pressed or DERIVED.pointer_target is not None:
-            return
-        if not judge.get_permission(CHECK, ["pointer"]):
-            return
-        organism.state = ARMED
-        organism.data = {"anchor": {"x": RAW.x, "y": RAW.y}}
-        return
+    IDLE state:
+        if the left mouse button wasn't just pressed, get out.
+        if the mouse pointer is over anything, get out
 
-    if organism.state == ARMED:
-        if DERIVED.button_1_released:
-            emit_world_effect("set-selection", {"object-ids": []})
-            clear_current_organism(organism)
-            return
-        if not DERIVED.drag_threshold_crossed:
-            return
-        if not judge.get_permission(COMMIT, ["pointer"]):
-            clear_current_organism(organism)
-            return
-        organism.state = SELECTING
+        ask the Judge if permission to use the pointer is available --
+          that is, CHECK permission: "pointer"; if it isn't, get out.
 
-    if organism.state == SELECTING:
-        rect = rectangle_from(organism.data["anchor"], RAW)
-        candidates = objects_intersecting(rect)
-        emit_projection_preview("marquee-preview", {
-            "rect": rect,
-            "object-ids": candidates,
-        })
-        if DERIVED.button_1_released:
-            emit_world_effect("set-selection", {"object-ids": candidates})
-            clear_current_organism(organism)
+        SUCCESS:
+        state <- ARMED
+        record the current mouse X, Y position as the marquee anchor.
+
+    ARMED state:
+        if the button is released:
+            emit the world effect: set-selection, object-ids = []
+            clear state to IDLE and get out.
+
+        if we haven't passed the drag threshold, get out.
+
+        ah, so we HAVE passed the drag threshold:
+        ask the Judge to COMMIT permission to the pointer;
+          if it cannot, clear state to IDLE and get out.
+
+        state <- SELECTING
+
+    SELECTING state:
+        calculate the rectangle from the marquee anchor to the current mouse
+          X, Y position.
+        find the model objects that intersect that rectangle.
+
+        emit a marquee-preview containing the rectangle and those candidate
+          object IDs.
+
+        if the left mouse button is released:
+            emit the world effect: set-selection, object-ids = the candidates
+            clear state to IDLE.
 ```
 
 ### Select Object on Click

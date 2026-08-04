@@ -70,4 +70,7 @@ While an object has a drag preview, its ordinary manipulation handles are not
 requested.  The drag itself is the active manipulation presentation.
 
 Immediate effects remain appropriate for overlays that do not stand in for a
-durable object visual, such as hover highlights and marquee outlines.
+durable object visual, such as hover highlights and marquee outlines.  A
+marquee preview also draws the hover-style halo around each of its candidate
+objects; this is a presentation of marquee candidacy, not an emitted hover
+fact.
