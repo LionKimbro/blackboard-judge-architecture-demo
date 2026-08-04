@@ -17,7 +17,8 @@ of `build_app()`, plus the `handle_*` Tk callback functions.
   checkbox.)
 - Registering this window's Canvas input, keyboard, and supporting-widget
   callbacks.
-- Translating Tk event objects into normalized runtime input updates.
+- Translating Tk event objects into normalized input events and posting them to
+  Input Event Queue.
 
 ## READS
 
@@ -26,14 +27,15 @@ of `build_app()`, plus the `handle_*` Tk callback functions.
 
 ## CALLS
 
-- `runtime.initialize_demo_state()` during window startup.
-- `runtime.run_cycle(raw_update)` from callback adapters.
+- `interaction_runtime.initialize_demo_state()` during window startup.
+- Input Event Queue posting functions from callback adapters.
+- `tk_runtime.now_ms()` to timestamp posted input events.
 
 ## MAY SAFELY ASSUME
 
 - App Shell has already created and withdrawn the Tk root.
 - Every callback runs on the Tkinter main thread.
-- Runtime owns interaction state and Projection owns Canvas drawing.
+- Interaction Runtime owns interaction state and Projection owns Canvas drawing.
 
 ## ENSURES
 
@@ -48,14 +50,15 @@ categories of callback:
 
 - **Canvas pointer callbacks:** pointer motion, primary-button press,
   primary-button release, and pointer leave.  Each adapter extracts toolkit
-  coordinates/state and calls `runtime.run_cycle(raw_update)`.
-- **Host-window keyboard callbacks:** application keyboard commands bound to
-  this Toplevel, initially Escape and `r` for resetting the demo.  The adapter
-  calls the appropriate runtime command; it does not perform reset behavior
-  itself.
+  coordinates/state and posts a normalized input event.  Pointer motion posts
+  a timestamped motion sample for queue-tail coalescing.
+- **Host-window keyboard callbacks:** keyboard bindings on this Toplevel,
+  initially Escape and `r`.  The adapters post raw key-pressed
+  and key-released events; they do not decide that a key means reset or any
+  other command.
 - **Supporting-widget command callbacks:** local controls owned by this
   window, initially the Quantize To Grid checkbox.  The adapter reports the
-  control's current value to the runtime and requests the normal update path.
+  widget name and current value by posting a raw widget-activated input event.
 
 These callbacks do not include Timer callbacks.  Timer owns its own `after()`
 callback and merely invokes the callback supplied when the timer is started.
@@ -87,5 +90,5 @@ function create_canvas_host_window():
     run_cycle({})                 # priming state and first projection
 
 function handle_canvas_pointer_motion(event):
-    run_cycle({ x: event.x, y: event.y, inside-canvas: True })
+    post_pointer_motion(event.x, event.y, tk_runtime.now_ms())
 ```

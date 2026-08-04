@@ -29,6 +29,8 @@ behavior, except for any explicitly accepted open decision.
 - Tests should call the runtime with normalized input rather than require live
   Tk windows whenever possible.
 - Tests must use a replaceable monotonic clock.
+- Add queue tests for pointer-motion tail coalescing, preserved sample order,
+  and the boundary created by an intervening non-motion event.
 - A deliberate architectural difference from the source must cite its ADR in
   the relevant test and module sketch.
 

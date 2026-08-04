@@ -32,8 +32,10 @@ current source are recorded in `adr/` before they guide a render.
 | --- | --- |
 | Application Shell | `src/bad_demo/app_shell.py` |
 | Canvas Host Window | `src/bad_demo/canvas_host_window.py` |
+| Input Event Queue | `src/bad_demo/event_queue.py` |
 | Periodic Timer | `src/bad_demo/timer.py` |
-| Interaction Runtime | `src/bad_demo/runtime.py` |
+| Tk Runtime | `src/bad_demo/tk_runtime.py` |
+| Interaction Runtime | `src/bad_demo/interaction_runtime.py` |
 | Tokenizers | `src/bad_demo/tokenizers.py` |
 | Judge | `src/bad_demo/judge.py` |
 | Interaction Organisms | `src/bad_demo/organisms.py` |

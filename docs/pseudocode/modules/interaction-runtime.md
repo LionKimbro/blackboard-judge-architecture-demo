@@ -7,19 +7,20 @@ and RAW population.
 
 ## Render Target
 
-`src/bad_demo/runtime.py`
+`src/bad_demo/interaction_runtime.py`
 
 ## OWNS
 
 - Construction and reset of the demo's shared runtime, world, and organism
   records.
+- Draining pending normalized input events and applying them in FIFO order.
 - Cycle ordering and snapshot replacement.
 - RAW population from callback input and current UI setting.
 
 ## READS
 
-- Normalized callback updates.
-- The quantization control through a narrow app-shell adapter.
+- Pending normalized input events from Input Event Queue.
+- The quantization control through a narrow Canvas Host Window adapter.
 - Monotonic clock interface.
 
 ## CALLS
@@ -29,6 +30,7 @@ and RAW population.
 - Organism evaluation.
 - Effect routing.
 - Projection refresh.
+- Input Event Queue drain operation.
 
 ## MAY SAFELY ASSUME
 
@@ -38,6 +40,8 @@ and RAW population.
 ## ENSURES
 
 - RAW-PREV and DERIVED-PREV represent the prior completed cycle.
+- Pointer-motion packets are processed sample-by-sample in their recorded
+  order, preserving the motion path while allowing queue coalescing.
 - Tokenizers run before organisms.
 - All organisms run against one stable world state.
 - Effects route after organism execution and before projection.
@@ -51,10 +55,27 @@ and RAW population.
 
 ## Sketch
 
-```text
-function run_cycle(raw-update, flags=[]):
+```python
+def run_update_cycle():
+    events = drain_events()
+    for event in events:
+        apply_event_to_runtime(event)
+    if events is empty:
+        run_cycle({})             # permits time-based facts to advance
+
+
+def apply_event_to_runtime(event):
+    if event.type == "POINTER_MOTION":
+        for sample in event.samples:
+            run_cycle(sample)
+        return
+
+    run_cycle(normalize_event_as_raw_update(event))
+
+
+def run_cycle(raw_update, flags=[]):
     preserve_previous_snapshots()
-    populate_current_raw(raw-update)
+    populate_current_raw(raw_update)
     run_tokenizers()
     maintain_judge()
     evaluate_organisms()

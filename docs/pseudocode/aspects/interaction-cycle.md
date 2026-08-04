@@ -2,12 +2,15 @@
 
 ## Participating Modules
 
-`canvas-host-window`, `timer`, `runtime`, `tokenizers`, `judge`, `organisms`,
-`effects-world`, and `projection`.
+`canvas-host-window`, `event-queue`, `timer`, `interaction-runtime`, `tokenizers`,
+`judge`, `organisms`, `effects-world`, and `projection`.
 
 ## Rule
 
-One interaction cycle has this fixed order:
+A periodic runtime update first drains Input Event Queue.  It then performs one
+interaction cycle for each normalized event; a coalesced pointer-motion event
+performs one cycle for each ordered motion sample.  Each interaction cycle has
+this fixed order:
 
 ```text
 preserve RAW and DERIVED snapshots
@@ -31,8 +34,8 @@ project the resulting visible state
 
 ## System Rules
 
-- Input callbacks from Canvas Host Window and periodic ticks from Timer both
-  enter through this cycle.
+- Canvas Host Window callbacks post to Input Event Queue.  Timer invokes the
+  runtime update, which drains that queue before it enters this cycle.
 - A periodic tick is allowed to run with no changed pointer data so temporal
   tokenizers can update.
 - No component may invoke a later architectural stage early or re-enter the
