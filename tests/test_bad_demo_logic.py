@@ -1,5 +1,6 @@
 from bad_demo import canvas_host_window
 from bad_demo import event_queue
+from bad_demo import grid
 from bad_demo import interaction_runtime as runtime
 from bad_demo import projection
 
@@ -30,19 +31,37 @@ class FakeCanvas:
             for item_id in [item_id for item_id, value in self.items.items() if value["kwargs"].get("tags") == "immediate"]:
                 self.items.pop(item_id)
             return
+        if isinstance(item, str):
+            for item_id in [item_id for item_id, value in self.items.items() if item in value["kwargs"].get("tags", ())]:
+                self.items.pop(item_id)
+            return
         self.items.pop(item, None)
 
     def coords(self, item, *args):
         self.items[item]["args"] = args
 
     def itemconfig(self, item, **kwargs):
+        if isinstance(item, str):
+            for value in self.items.values():
+                if item in value["kwargs"].get("tags", ()):
+                    value["kwargs"].update(kwargs)
+            return
         self.items[item]["kwargs"].update(kwargs)
+
+    itemconfigure = itemconfig
+
+    def tag_raise(self, tag, above):
+        del tag, above
+
+    def tag_lower(self, tag, below):
+        del tag, below
 
 
 def setup_bad_demo():
     event_queue.events.clear()
     projection.g["items"].clear()
     projection.g["specs"].clear()
+    grid.g.update({"canvas": None, "configuration": None})
     canvas_host_window.widgets["canvas"] = FakeCanvas()
     runtime.initialize_demo_state()
     runtime.run_cycle({"ms": 1000})
@@ -148,6 +167,37 @@ def test_projection_reuses_a_persistent_canvas_item():
     runtime.run_cycle({"ms": 1100})
 
     assert projection.g["items"]["object:alpha:body"] == first_item
+
+
+def test_projection_requests_grid_visibility_from_the_show_grid_control():
+    setup_bad_demo()
+    canvas = canvas_host_window.widgets["canvas"]
+    grid_lines = [item for item in canvas.items.values() if "gridline" in item["kwargs"].get("tags", ())]
+
+    assert grid_lines
+    assert {item["kwargs"]["state"] for item in grid_lines} == {"hidden"}
+
+    event_queue.post_event({"type": "WIDGET_ACTIVATED", "widget": "show-grid-checkbox", "value": True, "ms": 1100})
+    runtime.run_update_cycle()
+
+    assert {item["kwargs"]["state"] for item in grid_lines} == {"normal"}
+
+
+def test_quantized_drag_previews_and_commits_the_same_snapped_positions():
+    setup_bad_demo()
+    event_queue.post_event({"type": "WIDGET_ACTIVATED", "widget": "quantization-checkbox", "value": True, "ms": 1050})
+    post_press(100, 120, 1100)
+    event_queue.post_pointer_motion(183, 207, 1200)
+    runtime.run_update_cycle()
+
+    preview = next(effect for effect in runtime.system["PREVIEWS"] if effect["name"] == "drag-preview")
+    assert preview["payload"]["positions"] == {"alpha": {"x": 150, "y": 170}}
+    assert {item["kwargs"]["state"] for item in canvas_host_window.widgets["canvas"].items.values() if "gridline" in item["kwargs"].get("tags", ())} == {"hidden"}
+
+    post_release(183, 207, 1300)
+    runtime.run_update_cycle()
+
+    assert {key: runtime.world["objects"]["alpha"][key] for key in ("x", "y")} == {"x": 150, "y": 170}
 
 
 def test_projection_ignores_a_canvas_destroyed_before_timer_callback():

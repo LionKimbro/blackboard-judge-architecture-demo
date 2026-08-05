@@ -78,6 +78,16 @@ def compute_group_delta_bound(objects, start_positions, delta, axis, right, bott
     return clamp(delta, lower, upper)
 
 
+def make_drag_positions(objects, start_positions, requested_dx, requested_dy, config, quantization_enabled):
+    """Return lawful positions from one shared, optionally snapped drag delta."""
+    if quantization_enabled:
+        requested_dx = snap_value(requested_dx, config["quantization-step"])
+        requested_dy = snap_value(requested_dy, config["quantization-step"])
+    dx = compute_group_delta_bound(objects, start_positions, requested_dx, "x", config["playfield-right"], config["canvas-height"], config["margin"])
+    dy = compute_group_delta_bound(objects, start_positions, requested_dy, "y", config["playfield-right"], config["canvas-height"], config["margin"])
+    return {object_id: {"x": start["x"] + dx, "y": start["y"] + dy} for object_id, start in start_positions.items()}
+
+
 def compute_resized_rect(start_rect, handle, pointer_x, pointer_y, right, bottom, minimum, margin):
     left, top = start_rect["x"], start_rect["y"]
     end_x, end_y = left + start_rect["w"], top + start_rect["h"]
@@ -86,3 +96,30 @@ def compute_resized_rect(start_rect, handle, pointer_x, pointer_y, right, bottom
     if "n" in handle: top = clamp(pointer_y, margin, end_y - minimum)
     if "s" in handle: end_y = clamp(pointer_y, top + minimum, bottom - margin)
     return {"x": left, "y": top, "w": end_x - left, "h": end_y - top}
+
+
+def make_resize_rectangle(start_rect, handle, pointer_x, pointer_y, config, quantization_enabled):
+    """Return the optionally snapped, lawful rectangle for one resize gesture."""
+    if quantization_enabled:
+        pointer_x = snap_value(pointer_x, config["quantization-step"])
+        pointer_y = snap_value(pointer_y, config["quantization-step"])
+    return compute_resized_rect(start_rect, handle, pointer_x, pointer_y, config["playfield-right"], config["canvas-height"], config["min-size"], config["margin"])
+
+
+def positions_are_lawful(objects, positions, config):
+    for object_id, position in positions.items():
+        obj = objects.get(object_id)
+        if obj is None:
+            return False
+        if not config["margin"] <= position["x"] <= config["playfield-right"] - obj["w"] - config["margin"]:
+            return False
+        if not config["margin"] <= position["y"] <= config["canvas-height"] - obj["h"] - config["margin"]:
+            return False
+    return True
+
+
+def rectangle_is_lawful(rect, config):
+    return (rect["w"] >= config["min-size"] and rect["h"] >= config["min-size"]
+            and rect["x"] >= config["margin"] and rect["y"] >= config["margin"]
+            and rect["x"] + rect["w"] <= config["playfield-right"] - config["margin"]
+            and rect["y"] + rect["h"] <= config["canvas-height"] - config["margin"])

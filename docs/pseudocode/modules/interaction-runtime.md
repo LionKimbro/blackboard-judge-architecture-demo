@@ -16,11 +16,16 @@ and RAW population.
 - Draining pending normalized input events and applying them in FIFO order.
 - Cycle ordering and snapshot replacement.
 - RAW population from callback input and current UI setting.
+- The authoritative display configuration: Canvas dimensions, playfield bounds,
+  and quantization step.
+- The authoritative quantization step, and capture of the current
+  quantization-enabled and show-grid checkbox values as separate RAW facts.
 
 ## READS
 
 - Pending normalized input events from Input Event Queue.
-- The quantization control through a narrow Canvas Host Window adapter.
+- The Show Grid and Quantize To Grid controls through narrow Canvas Host
+  Window adapters.
 - Monotonic clock interface.
 
 ## CALLS
@@ -47,6 +52,11 @@ and RAW population.
 - Effects route after organism execution and before projection.
 - A caller may invoke the cycle with no changed pointer data so temporal facts
   can advance without new pointer motion.
+- Projection receives the authoritative display configuration when it renders;
+  it may pass the grid-relevant portion to Grid without becoming the owner of
+  those numbers.
+- Interaction modules receive the current quantization fact and configuration
+  through the normal cycle; see [Quantization](../aspects/quantization.md).
 
 ## DOES NOT OWN
 

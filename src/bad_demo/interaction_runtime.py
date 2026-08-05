@@ -36,7 +36,8 @@ def record(name, fn):
 
 def make_initial_raw():
     return {"x": 0, "y": 0, "ms": 0, "inside-canvas": True, "button-1-down": False,
-            "mouse-over": None, "keys-down": {}, "widget-values": {}, "quantization-step": config["quantization-step"]}
+            "mouse-over": None, "keys-down": {}, "widget-values": {},
+            "show-grid": False, "quantization-enabled": False, "quantization-step": config["quantization-step"]}
 
 
 def run_update_cycle():
@@ -60,6 +61,8 @@ def apply_event_to_runtime(event):
         keys = dict(system["RAW"]["keys-down"]); keys[event["keysym"]] = event["type"] == "KEY_PRESSED"; update["keys-down"] = keys
     elif event["type"] == "WIDGET_ACTIVATED":
         values = dict(system["RAW"]["widget-values"]); values[event["widget"]] = event["value"]; update["widget-values"] = values
+        if event["widget"] == "show-grid-checkbox": update["show-grid"] = bool(event["value"])
+        if event["widget"] == "quantization-checkbox": update["quantization-enabled"] = bool(event["value"])
     else: raise ValueError(f"Unknown input event: {event['type']}")
     run_cycle(update)
 

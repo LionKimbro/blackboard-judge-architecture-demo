@@ -90,6 +90,9 @@ Produced by a host-window key-release adapter.
 
 Produced by a supporting-widget callback.  It identifies the concrete widget
 and reports its current raw/widget value without naming a semantic command.
+The Canvas Host Window currently uses it for `show-grid-checkbox` and
+`quantization-checkbox`; their distinct meanings are assigned only by
+Interaction Runtime and its consumers.
 
 ```python
 {

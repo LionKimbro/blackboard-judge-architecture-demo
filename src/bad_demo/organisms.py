@@ -60,7 +60,8 @@ def organism_resize_object(system, world, config, organism):
             return
         organism["STATE"] = DRAGGING
     if organism["STATE"] == DRAGGING:
-        payload = {**organism["HELD"], "start-rect": organism["DATA"]["start-rect"], "x": raw["x"], "y": raw["y"]}
+        rect = geometry.make_resize_rectangle(organism["DATA"]["start-rect"], organism["HELD"]["handle"], raw["x"], raw["y"], config, raw["quantization-enabled"])
+        payload = {"object-id": organism["HELD"]["object-id"], "rect": rect}
         effects_world.emit_projection_effect(system["EFFECTS"], organism["NAME"], "resize-preview", payload)
         if d["button-1-released"]:
             effects_world.emit_world_effect(system["EFFECTS"], organism["NAME"], "resize-object", payload)
@@ -100,10 +101,8 @@ def organism_drag_objects(system, world, config, organism):
         organism["STATE"] = DRAGGING
     if organism["STATE"] == DRAGGING:
         start_positions, anchor = organism["DATA"]["start-positions"], organism["DATA"]["anchor"]
-        dx = geometry.compute_group_delta_bound(world["objects"], start_positions, raw["x"] - anchor["x"], "x", config["playfield-right"], config["canvas-height"], config["margin"])
-        dy = geometry.compute_group_delta_bound(world["objects"], start_positions, raw["y"] - anchor["y"], "y", config["playfield-right"], config["canvas-height"], config["margin"])
-        positions = {object_id: {"x": start["x"] + dx, "y": start["y"] + dy} for object_id, start in start_positions.items()}
-        payload = {"object-ids": organism["HELD"]["object-ids"], "start-positions": start_positions, "positions": positions, "dx": dx, "dy": dy}
+        positions = geometry.make_drag_positions(world["objects"], start_positions, raw["x"] - anchor["x"], raw["y"] - anchor["y"], config, raw["quantization-enabled"])
+        payload = {"object-ids": organism["HELD"]["object-ids"], "positions": positions}
         effects_world.emit_projection_effect(system["EFFECTS"], organism["NAME"], "drag-preview", payload)
         if d["button-1-released"]:
             effects_world.emit_world_effect(system["EFFECTS"], organism["NAME"], "move-objects", payload)

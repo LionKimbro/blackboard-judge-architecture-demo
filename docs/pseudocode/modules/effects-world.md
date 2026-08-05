@@ -23,6 +23,8 @@ helpers, and persistent-effect application helpers.
 ## CALLS
 
 - Geometry helpers for group movement and resize calculations.
+- Lawfulness validation for proposed geometry.  See
+  [Quantization](../aspects/quantization.md).
 
 ## MAY SAFELY ASSUME
 
@@ -34,6 +36,8 @@ helpers, and persistent-effect application helpers.
 - World mutation effects apply in emission order.
 - Volatile effects survive only long enough for the following projection pass.
 - Unknown effect names fail visibly rather than silently changing no state.
+- A quantized interaction effect commits the exact proposal previously shown
+  in its preview; Effects World does not calculate another snap result.
 
 ## DOES NOT OWN
 
@@ -42,7 +46,5 @@ helpers, and persistent-effect application helpers.
 ## Initial World Effects
 
 - Set committed selection.
-- Move one object.
-- Move the selected group within playfield bounds.
-- Resize one object while respecting minimum size and playfield bounds.
-
+- Move one or more objects to supplied lawful proposed positions.
+- Resize one object to a supplied lawful proposed rectangle.

@@ -32,13 +32,13 @@ def apply_world_effect(world, effect, config):
     if effect["name"] == "set-selection":
         world["selected-objects"] = list(payload["object-ids"])
     elif effect["name"] == "move-objects":
-        for object_id, start in payload["start-positions"].items():
-            world["objects"][object_id]["x"] = start["x"] + payload["dx"]
-            world["objects"][object_id]["y"] = start["y"] + payload["dy"]
+        if not geometry.positions_are_lawful(world["objects"], payload["positions"], config):
+            raise ValueError("Move proposal is outside lawful playfield bounds")
+        for object_id, position in payload["positions"].items():
+            world["objects"][object_id].update(position)
     elif effect["name"] == "resize-object":
-        obj = world["objects"][payload["object-id"]]
-        rect = geometry.compute_resized_rect(payload["start-rect"], payload["handle"], payload["x"], payload["y"],
-                                             config["playfield-right"], config["canvas-height"], config["min-size"], config["margin"])
-        obj.update(rect)
+        if not geometry.rectangle_is_lawful(payload["rect"], config):
+            raise ValueError("Resize proposal is outside lawful bounds")
+        world["objects"][payload["object-id"]].update(payload["rect"])
     else:
         raise ValueError(f"Unknown world effect: {effect['name']}")

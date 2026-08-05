@@ -21,6 +21,8 @@
 - RAW and DERIVED facts.
 - Current durable world objects and committed selection.
 - Judge permission results.
+- The current quantization fact and configured step when a gesture proposes
+  geometry.  See [Quantization](../aspects/quantization.md).
 
 ## CALLS
 
@@ -45,10 +47,12 @@
 ## DOES NOT OWN
 
 - Hit-testing
+- Button click or double-click detection
 - Drag-threshold recognition
 - Resource arbitration
 - Direct world mutation
 - (direct) Canvas drawing
+
 
 ## Included Organisms
 
@@ -93,9 +97,9 @@ def evaluate_organisms():
 
 
 def clear_current_organism(organism):
-    organism.state = IDLE
-    organism.held = {}
-    organism.data = {}
+    state <- IDLE
+    clear held ({})
+    clear data ({})
 ```
 
 ### Hover Highlight
@@ -155,8 +159,10 @@ def organism_drag_objects(organism):
         state <- DRAGGING
 
     DRAGGING state:
-        calculate a proposed drag delta, respecting clamping for every object
-          being dragged.
+        calculate lawful proposed positions for every object being dragged:
+            use the one shared drag delta.
+            when quantization is enabled, snap that shared delta before
+              constraining it.
 
         emit a drag-preview for all objects being dragged, at their proposed
           positions.
@@ -164,9 +170,7 @@ def organism_drag_objects(organism):
         if the left mouse button is released, emit:
             move-objects,
             object-ids,
-            starting positions,
-            dx,
-            dy
+            proposed positions
         ...and then clear state to IDLE.
 ```
 
@@ -206,21 +210,15 @@ def organism_resize_object(organism):
         organism.state = DRAGGING
 
     if organism.state == DRAGGING:
-        proposed_rect = compute_bounded_resize_rect(
-            organism.data["start-rect"], organism.held["handle"], RAW.x, RAW.y,
-        )
-        emit_projection_preview("resize-preview", {
-            "object-id": organism.held["object-id"],
-            "rect": proposed_rect,
-        })
+        calculate a lawful proposed rectangle from the starting rectangle,
+          held handle, and current pointer position.
+        when quantization is enabled, use a snapped pointer position to make
+          that proposal.
+
+        emit a resize-preview containing the proposed rectangle.
         if DERIVED.button_1_released:
-            emit_world_effect("resize-object", {
-                "object-id": organism.held["object-id"],
-                "handle": organism.held["handle"],
-                "start-rect": organism.data["start-rect"],
-                "x": RAW.x,
-                "y": RAW.y,
-            })
+            emit a resize-object world effect containing that same proposed
+              rectangle.
             clear_current_organism(organism)
 ```
 

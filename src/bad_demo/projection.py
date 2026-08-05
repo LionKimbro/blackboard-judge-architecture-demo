@@ -1,6 +1,6 @@
 """Retained-mode Canvas reconciliation for the BAD-rendered demo."""
 
-from . import canvas_host_window, geometry
+from . import canvas_host_window, geometry, grid
 
 
 g = {"items": {}, "specs": {}}
@@ -23,25 +23,28 @@ def render_projection(world, previews, config, raw):
     canvas.delete("immediate")
     desired = build_desired_state(world, previews, config, raw)
     reconcile(canvas, desired)
+    grid.ensure_grid(canvas, make_grid_configuration(config), raw["show-grid"])
     draw_immediates(canvas, world, previews, config)
 
 
 def build_desired_state(world, previews, config, raw):
     presentation = build_preview_presentation(world, previews, config)
-    desired = {"background": ("rectangle", (0, 0, config["canvas-width"], config["canvas-height"]), {"fill": "#f6f2e8", "outline": ""})}
-    if raw.get("widget-values", {}).get("quantization-checkbox"):
-        for x in range(0, config["playfield-right"], raw.get("quantization-step", 20)):
-            desired[f"grid:x:{x}"] = ("line", (x, 0, x, config["canvas-height"]), {"fill": "#ddd7ca"})
+    desired = {"background": ("rectangle", (0, 0, config["canvas-width"], config["canvas-height"]), {"fill": "#f6f2e8", "outline": "", "tags": "canvas-background"})}
     for object_id, obj in presentation.items():
         selected = object_id in world["selected-objects"]
-        desired[f"object:{object_id}:body"] = ("rectangle", (obj["x"], obj["y"], obj["x"] + obj["w"], obj["y"] + obj["h"]), {"fill": obj["fill"], "outline": "#1f4f7a" if selected else "#24323a", "width": 4 if selected else 2})
-        desired[f"object:{object_id}:label"] = ("text", (obj["x"] + 8, obj["y"] + 8), {"text": obj["label"], "anchor": "nw", "fill": "white"})
+        desired[f"object:{object_id}:body"] = ("rectangle", (obj["x"], obj["y"], obj["x"] + obj["w"], obj["y"] + obj["h"]), {"fill": obj["fill"], "outline": "#1f4f7a" if selected else "#24323a", "width": 4 if selected else 2, "tags": "model-object"})
+        desired[f"object:{object_id}:label"] = ("text", (obj["x"] + 8, obj["y"] + 8), {"text": obj["label"], "anchor": "nw", "fill": "white", "tags": "model-object"})
     selected_id = geometry.single_selected_object_id(world)
     dragged_object_ids = preview_dragged_object_ids(previews)
     if selected_id and selected_id not in dragged_object_ids:
         for handle, (x, y) in geometry.resize_handle_centers(presentation[selected_id]).items():
             desired[f"handle:{selected_id}:{handle}"] = ("rectangle", (x - config["handle-half"], y - config["handle-half"], x + config["handle-half"], y + config["handle-half"]), {"fill": "white", "outline": "#1f4f7a"})
     return desired
+
+
+def make_grid_configuration(config):
+    return {"left": 0, "right": config["playfield-right"], "top": 0,
+            "bottom": config["canvas-height"], "step": config["quantization-step"]}
 
 
 def preview_dragged_object_ids(previews):
@@ -63,8 +66,7 @@ def build_preview_presentation(world, previews, config):
                 if object_id in presentation:
                     presentation[object_id].update(position)
         elif name == "resize-preview" and payload["object-id"] in presentation:
-            rect = geometry.compute_resized_rect(payload["start-rect"], payload["handle"], payload["x"], payload["y"], config["playfield-right"], config["canvas-height"], config["min-size"], config["margin"])
-            presentation[payload["object-id"]].update(rect)
+            presentation[payload["object-id"]].update(payload["rect"])
     return presentation
 
 

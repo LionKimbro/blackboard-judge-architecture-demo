@@ -40,5 +40,6 @@ current source are recorded in `adr/` before they guide a render.
 | Judge | `src/bad_demo/judge.py` |
 | Interaction Organisms | `src/bad_demo/organisms.py` |
 | Effects and World Mutation | `src/bad_demo/effects_world.py` |
+| Grid | `src/bad_demo/grid.py` |
 | Projection | `src/bad_demo/projection.py` |
 | Geometry and Query Helpers | `src/bad_demo/geometry.py` |
