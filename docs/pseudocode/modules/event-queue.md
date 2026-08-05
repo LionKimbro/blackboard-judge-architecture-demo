@@ -17,7 +17,8 @@ invokes the interaction cycle directly from Tk callbacks.
 
 ## READS
 
-- Normalized event records supplied by Canvas Host Window.
+- Normalized event records supplied by Canvas Host Window or Interaction
+  Runtime's temporal tick.
 
 ## CALLS
 
@@ -25,7 +26,8 @@ invokes the interaction cycle directly from Tk callbacks.
 
 ## MAY SAFELY ASSUME
 
-- Producers post events on the Tkinter main thread.
+- Canvas Host Window and Interaction Runtime post events on the Tkinter main
+  thread.
 - Runtime is the sole consumer.
 
 ## ENSURES

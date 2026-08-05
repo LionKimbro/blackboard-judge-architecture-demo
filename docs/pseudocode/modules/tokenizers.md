@@ -58,9 +58,15 @@
 ## Sketch
 
 ```text
+tokenizers = []
+
+function initialize_tokenizers():
+    clear tokenizers
+    register the tokenizer records in their required evaluation order
+
 function run_tokenizers():
     set_current_derived_to_empty_mapping()
-    for tokenizer in tokenizer_registry_in_order:
+    for tokenizer in tokenizers:
         if tokenizer.active:
             tokenizer.compute_its_facts()
 ```

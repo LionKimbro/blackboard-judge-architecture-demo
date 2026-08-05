@@ -103,12 +103,22 @@ Interaction Runtime and its consumers.
 }
 ```
 
+### `TIME_PASSES`
+
+Produced by Interaction Runtime when its update cycle finds the queue empty.
+It records only that a new monotonic time value is available; it is neither a
+semantic command nor a user-input fact.
+
+```python
+{"type": "TIME_PASSES", "ms": 123456}
+```
+
 ## Consumer Rule
 
 Interaction Runtime consumes events in FIFO order.  It expands a
 `POINTER_MOTION` event into its samples in list order before processing the
 next queued event.  It converts each input event into the appropriate RAW
-update.  Tokenizers may derive a command fact or other higher-level perceptual
+update.  `TIME_PASSES` updates only RAW's `ms` value.  Tokenizers may derive a command fact or other higher-level perceptual
 fact from those RAW values; the input queue does not do so.  Organisms and
 projection do not consume queued events directly.
 

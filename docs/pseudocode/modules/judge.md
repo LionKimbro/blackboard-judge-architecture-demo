@@ -13,18 +13,20 @@ writers, and `get_permission()`.
 
 - COORDINATION: pointer owner, active gesture, resource holds, leases, hover
   target, and diagnostic notes.
+- Its `coordination` bundle and initialization.
 - Permission decisions for CHECK and COMMIT requests.
 - Releasing claims when their corresponding organism is no longer active.
 
 ## READS
 
 - The requesting organism identity and requested resources.
-- Minimal public organism state necessary to verify active leases.
+- The active-organism view supplied by Organisms, necessary to verify active
+  leases.
 
 ## CALLS
 
-- No behavior module.  This module is a coordination authority, not an
-  interaction dispatcher.
+- `organisms.get_active_organism_names()` as a narrow public view.  This module
+  is a coordination authority, not an interaction dispatcher.
 
 ## MAY SAFELY ASSUME
 
@@ -47,6 +49,17 @@ writers, and `get_permission()`.
 ## Sketch
 
 ```text
+coordination = {
+    "pointer-owner": None,
+    "active-gesture": None,
+    "resource-holds": {},
+    "leases": {},
+    "judge-notes": [],
+}
+
+function initialize_judge():
+    reset every coordination slot to its initial value
+
 function get_permission(request, resources=[]):
     if request == CHECK:
         return resources_are_available_or_already_mine(resources)

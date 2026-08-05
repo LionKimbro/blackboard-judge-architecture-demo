@@ -12,6 +12,7 @@
 ## OWNS
 
 - Organism finite-state-machine records and organism-local held/data values.
+- The ordered organism registry and its initialization.
 - Gesture behavior for hover, object dragging, resize, marquee selection, and
   click selection.
 - Emission of semantic world-mutation and volatile projection-preview effects.
@@ -75,13 +76,19 @@ DRAGGING = "DRAGGING"
 SELECTING = "SELECTING"
 
 
-organisms_in_registration_order = [
+organisms = []
+
+def initialize_organisms():
+    clear organisms
+    register organisms in the required priority order:
     hover_highlight,
     organism_select_object_on_click,
     resize_object,
     drag_objects,
     marquee_select,
-]
+
+def get_active_organism_names():
+    return the names of organisms whose state is not IDLE
 
 note: When multiple organisms become eligible in the same cycle,
       registration order is priority. The first organism that
@@ -91,7 +98,7 @@ note: When multiple organisms become eligible in the same cycle,
 def evaluate_organisms():
     EFFECTS.clear()
 
-    for organism in organisms_in_registration_order:
+    for organism in organisms:
         if organism.active:
             organism.fn()
 

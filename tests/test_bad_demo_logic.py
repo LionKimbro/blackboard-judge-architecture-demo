@@ -1,5 +1,6 @@
 from bad_demo import canvas_host_window
 from bad_demo import event_queue
+from bad_demo import effects_world
 from bad_demo import grid
 from bad_demo import interaction_runtime as runtime
 from bad_demo import projection
@@ -85,6 +86,20 @@ def test_pointer_motion_coalesces_only_at_pending_tail():
     assert len(event_queue.events) == 3
     assert event_queue.events[0]["samples"] == [{"x": 1, "y": 2, "ms": 10}, {"x": 3, "y": 4, "ms": 20}]
     assert event_queue.events[2]["samples"] == [{"x": 5, "y": 6, "ms": 30}]
+
+
+def test_idle_update_posts_and_consumes_a_typed_time_passes_event(monkeypatch):
+    setup_bad_demo()
+    monkeypatch.setattr(runtime.tk_runtime, "now_ms", lambda: 1100)
+    posted = []
+    original_post_event = event_queue.post_event
+    monkeypatch.setattr(event_queue, "post_event", lambda event: (posted.append(event), original_post_event(event))[1])
+
+    runtime.run_update_cycle()
+
+    assert runtime.raw["ms"] == 1100
+    assert posted == [{"type": "TIME_PASSES", "ms": 1100}]
+    assert event_queue.events == []
 
 
 def test_click_selects_an_object_through_the_input_queue():
@@ -190,7 +205,7 @@ def test_quantized_drag_previews_and_commits_the_same_snapped_positions():
     event_queue.post_pointer_motion(183, 207, 1200)
     runtime.run_update_cycle()
 
-    preview = next(effect for effect in runtime.system["PREVIEWS"] if effect["name"] == "drag-preview")
+    preview = next(effect for effect in effects_world.get_current_previews() if effect["name"] == "drag-preview")
     assert preview["payload"]["positions"] == {"alpha": {"x": 150, "y": 170}}
     assert {item["kwargs"]["state"] for item in canvas_host_window.widgets["canvas"].items.values() if "gridline" in item["kwargs"].get("tags", ())} == {"hidden"}
 
