@@ -98,6 +98,19 @@ function handle_canvas_pointer_motion(event):
 
 ### Window and Control Layout
 
+Desired layout:
+
+```text
+[                                           ]
+[                 Canvas                    ]
+[                                           ]
+---------------------------------------------
+(widget row)
+```
+
+The widget row contains a **Show Grid** checkbox and a **Quantize To Grid**
+checkbox, with Quantize To Grid placed to the right of Show Grid.
+
 ```python
 def create_canvas_and_controls():
     create the Canvas at the configured size.
