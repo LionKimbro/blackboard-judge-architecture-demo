@@ -7,6 +7,14 @@
       "url": "https://chatgpt.com/c/69c0c5eb-1a64-83e8-90d4-448d00b86dcb",
       "hook": "",
       "description": ""
+    },
+    {
+      "id": "81708163-1697-4234-9e15-49029ab15fbc",
+      "date": "2026-08-05",
+      "title": "Decision to Shutter BAD Project",
+      "url": "https://chatgpt.com/c/6a737518-1510-83e8-964a-44c957b7c9e9",
+      "hook": "",
+      "description": "\"Freeze Blackboard Judge now as the reverse-engineering case study. Do not finish polishing it. Then start a small but genuinely interesting forward-built project.\"\n\nI've decided to shutter attemping this reverse engineered BAD implementation.  The reverse engineering was laborious."
     }
   ]
 }
